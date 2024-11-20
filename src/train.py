@@ -1,53 +1,51 @@
-from torch_geometric.transforms import NormalizeFeatures
-import torch
+import wandb
+import torch_geometric.loader as geom_data
+import pytorch_lightning as pl
+from pytorch_lightning.callbacks import ModelCheckpoint
 
-from .dataset import GeneDataset
-from .model import GCN
+import os
 
-dataset = GeneDataset(
-    root="./data", 
-    filenames=["gtex_genes.csv", "gene_graph.csv"],
-    test_size=0.2,
-    val_size=0.0,
-    transform=NormalizeFeatures())
-model = GCN(dataset[0], hidden_channels=16)
+from models.lightning_gnn_model import LightningGNNModel
+from config import Config
 
-learning_rate = 0.01
-decay = 5e-4
-optimizer = torch.optim.Adam(model.parameters(), 
-                             lr=learning_rate, 
-                             weight_decay=decay)
 
-criterion = torch.nn.CrossEntropyLoss()
 
-def train():
-      model.train()
-      optimizer.zero_grad() 
-      # Use all data as input, because all nodes have node features
-      out = model(dataset)  
-      # Only use nodes with labels available for loss calculation --> mask
-      loss = criterion(out[dataset.train_mask], dataset.y[dataset.train_mask])  
-      loss.backward() 
-      optimizer.step()
-      return loss
+def train_node_classifier(model_name, dataset, **model_kwargs):
+    pl.seed_everything(42)
+    node_data_loader = geom_data.DataLoader(dataset, num_workers=11, persistent_workers=True)
 
-def test():
-      model.eval()
-      out = model(dataset)
-      # Use the class with highest probability.
-      pred = out.argmax(dim=1)  
-      # Check against ground-truth labels.
-      test_correct = pred[dataset.test_mask] == dataset.y[dataset.test_mask]  
-      # Derive ratio of correct predictions.
-      test_acc = int(test_correct.sum()) / int(dataset.test_mask.sum())  
-      return test_acc
+    # Create a PyTorch Lightning trainer
+    root_dir = os.path.join(Config.checkpoint_path, "TestGCN" + model_name)
+    os.makedirs(root_dir, exist_ok=True)
+    trainer = pl.Trainer(
+        default_root_dir=root_dir,
+        callbacks=[ModelCheckpoint(save_weights_only=True, mode="max", monitor="val_acc")],
+        accelerator="auto",
+        devices=1,
+        max_epochs=Config.epochs,
+        enable_progress_bar=False,
+        log_every_n_steps=1,
+        logger=pl.loggers.WandbLogger(project="gene-disease-test", log_model="all")
+    )
+    trainer.logger._default_hp_metric = None  # Optional logging argument that we don't need
 
-losses = []
-for epoch in range(0, 1001):
-    loss = train()
-    losses.append(loss)
-    if epoch % 100 == 0:
-      print(f'Epoch: {epoch:03d}, Loss: {loss:.4f}')
+    # Check whether pretrained model exists. If yes, load it and skip training
+    # pretrained_filename = os.path.join(CHECKPOINT_PATH, f"TestGCN{model_name}.ckpt")
+    # if os.path.isfile(pretrained_filename):
+    #     print("Found pretrained model, loading...")
+    #     model = TestGCN.load_from_checkpoint(pretrained_filename)
+    # else:
+    pl.seed_everything()
+    model = LightningGNNModel(
+        model_name=model_name, c_in=dataset.num_node_features, c_out=dataset.num_classes, **model_kwargs
+    )
+    trainer.fit(model, node_data_loader, node_data_loader)
+    model = LightningGNNModel.load_from_checkpoint(trainer.checkpoint_callback.best_model_path)
 
-test_acc = test()
-print(f'Test Accuracy: {test_acc:.4f}')
+    # Test best model on the test set
+    test_result = trainer.test(model, dataloaders=node_data_loader)
+    result = {"test": test_result[0]["test_acc"]}
+    wandb.finish()
+    return model, result
+      
+      

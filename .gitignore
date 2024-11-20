@@ -1,4 +1,8 @@
-/data
+**/data
+**/wandb
+**/gene-disease-test
+/results
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
