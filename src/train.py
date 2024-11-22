@@ -37,7 +37,7 @@ def train_node_classifier(model_name, dataset, **model_kwargs):
     # else:
     pl.seed_everything()
     model = LightningGNNModel(
-        model_name=model_name, c_in=dataset.num_node_features, c_out=dataset.num_classes, **model_kwargs
+        model_name=model_name, c_in=dataset.num_node_features, c_out=dataset[0].y.shape[1], **model_kwargs
     )
     trainer.fit(model, node_data_loader, node_data_loader)
     model = LightningGNNModel.load_from_checkpoint(trainer.checkpoint_callback.best_model_path)
@@ -45,7 +45,6 @@ def train_node_classifier(model_name, dataset, **model_kwargs):
     # Test best model on the test set
     test_result = trainer.test(model, dataloaders=node_data_loader)
     result = {"test": test_result[0]["test_acc"]}
-    wandb.finish()
     return model, result
       
       
