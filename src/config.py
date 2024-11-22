@@ -4,9 +4,13 @@ import torch
 import os
 
 class Config():
-    min_disease_s_gene_number = 0
-    train_test_split = 0.2
+    min_disease_s_gene_number = 7
+    train_test_split = 0.5
     test_val_split = 0.5
+
+    learning_rate = 0.01
+    weight_decay = 5e-4
+    num_classes = 2
 
     epochs = 1
     

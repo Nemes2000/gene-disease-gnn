@@ -72,10 +72,7 @@ class GeneDataset(Dataset):
                     edge_weight=edge_feats,
                     test_mask=test_mask, val_mask=validation_mask, train_mask=train_mask, y=y)
 
-        if self.test:
-            torch.save(data, os.path.join(self.processed_dir, 'graph_test.pt'))
-        else:
-            torch.save(data, os.path.join(self.processed_dir, 'graph.pt'))
+        torch.save(data, os.path.join(self.processed_dir, 'graph.pt'))
 
 
     def _get_train_val_test_mask(self, disiese_gene_matrix):
@@ -181,10 +178,7 @@ class GeneDataset(Dataset):
         """ - Equivalent to __getitem__ in pytorch
             - Is not needed for PyG's InMemoryDataset
         """
-        if self.test:
-            graph = torch.load(os.path.join(self.processed_dir, 'graph_test.pt'), weights_only=False)
-        else:
-            graph = torch.load(os.path.join(self.processed_dir, 'graph.pt'), weights_only=False)
+        graph = torch.load(os.path.join(self.processed_dir, 'graph.pt'), weights_only=False)
 
         return graph
 

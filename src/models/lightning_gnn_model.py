@@ -7,6 +7,7 @@ from torchmetrics import ConfusionMatrix, AUROC, F1Score, Precision, Recall
 
 from models.basic_model import BasicGNNModel
 from datasets.gene_dataset import GeneDataset
+from config import Config
 
 
 class LightningGNNModel(pl.LightningModule):
@@ -16,14 +17,14 @@ class LightningGNNModel(pl.LightningModule):
         self.loss_module = nn.CrossEntropyLoss()
         self.model = BasicGNNModel(**model_kwargs)
 
-        self.learning_rate=0.01
-        self.decay=5e-4
+        self.learning_rate=Config.learning_rate
+        self.decay=Config.weight_decay
 
-        self.cm = ConfusionMatrix(task="binary", num_classes=2)
-        self.aucroc = AUROC(task="binary", num_classes=2)
-        self.f1 = F1Score(task="binary", num_classes=2)
-        self.precision = Precision(task="binary", num_classes=2)
-        self.recall = Recall(task="binary", num_classes=2)
+        self.cm = ConfusionMatrix(task="binary", num_classes=Config.num_classes)
+        self.aucroc = AUROC(task="binary", num_classes=Config.num_classes)
+        self.f1 = F1Score(task="binary", num_classes=Config.num_classes)
+        self.precision = Precision(task="binary", num_classes=Config.num_classes)
+        self.recall = Recall(task="binary", num_classes=Config.num_classes)
 
     def forward(self, data, mode="train"):
         x, edge_index, edge_weight = data.x, data.edge_index, data.edge_weight
@@ -52,12 +53,12 @@ class LightningGNNModel(pl.LightningModule):
         self.log('train_acc', acc, prog_bar=True, on_epoch=True)
         return loss
 
-    def validation_step(self, data: GeneDataset):
+    def validation_step(self, data):
         loss, acc = self.forward(data, mode="val")
         self.log("val_acc", acc)
         self.log("val_loss", loss)
 
-    def test_step(self, data: GeneDataset):
+    def test_step(self, data):
         loss, acc, x = self.forward(data, mode="test")
         x_masked = x[data.test_mask]
         y_masked = data.y[data.test_mask]

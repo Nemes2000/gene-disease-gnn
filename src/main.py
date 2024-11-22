@@ -14,10 +14,13 @@ if __name__ == "__main__":
     dataset = GeneDataset(
         root="./data",
         filenames=["gtex_genes.csv", "gene_graph.csv", "disgenet_with_gene_id.csv"],
-        test_size=0.2,
-        val_size=0.0,
+        test_size=Config.train_test_split,
+        val_size=Config.test_val_split,
         transform=NormalizeFeatures())
 
     node_mlp_model, node_mlp_result = train_node_classifier(
         model_name="GCN", dataset=dataset, c_hidden=16, num_layers=2, dp_rate=0.1
     )
+
+    wandb.finish()
+
