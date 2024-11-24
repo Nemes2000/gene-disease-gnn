@@ -1,24 +1,23 @@
 import torch
-import torch.nn as nn
 
 import pytorch_lightning as pl
 
 from torchmetrics import ConfusionMatrix, AUROC, F1Score, Precision, Recall
 
 from models.basic_model import BasicGNNModel
-from datasets.gene_dataset import GeneDataset
 from config import Config
 
 
 class LightningGNNModel(pl.LightningModule):
-    def __init__(self, model_name, **model_kwargs):
+    def __init__(self, model_name):
         super().__init__()
         self.save_hyperparameters()
-        self.loss_module = nn.CrossEntropyLoss()
-        self.model = BasicGNNModel(**model_kwargs)
+        self.loss_function = torch.nn.CrossEntropyLoss()
 
-        self.learning_rate=Config.learning_rate
-        self.decay=Config.weight_decay
+        if model_name == "basic":
+            self.model = BasicGNNModel()
+        else:
+            self.model = BasicGNNModel()
 
         self.cm = ConfusionMatrix(task="binary", num_classes=Config.num_classes)
         self.aucroc = AUROC(task="binary", num_classes=Config.num_classes)
@@ -40,7 +39,7 @@ class LightningGNNModel(pl.LightningModule):
         else:
             assert False, f"Unknown forward mode: {mode}"
 
-        loss = self.loss_module(new_x[mask], data.y[mask])
+        loss = self.loss_function(new_x[mask], data.y[mask])
         acc = (new_x[mask].argmax(dim=-1) == data.y[mask]).sum().float() / mask.sum()
 
         if mode == "test":
@@ -49,22 +48,22 @@ class LightningGNNModel(pl.LightningModule):
 
     def training_step(self, data):
         loss, acc = self.forward(data, mode="train")
-        self.log('train_loss', loss, prog_bar=True, on_epoch=True)
-        self.log('train_acc', acc, prog_bar=True, on_epoch=True)
+        self.log('train_loss', loss, prog_bar=True, on_epoch=True, batch_size=1)
+        self.log('train_acc', acc, prog_bar=True, on_epoch=True, batch_size=1)
         return loss
 
     def validation_step(self, data):
         loss, acc = self.forward(data, mode="val")
-        self.log("val_acc", acc)
-        self.log("val_loss", loss)
+        self.log("val_acc", acc, batch_size=1)
+        self.log("val_loss", loss, batch_size=1)
 
     def test_step(self, data):
         loss, acc, x = self.forward(data, mode="test")
         x_masked = x[data.test_mask]
         y_masked = data.y[data.test_mask]
 
-        self.log("test_acc", acc)
-        self.log('test_loss', loss, prog_bar=True, on_epoch=True)
+        self.log("test_acc", acc, batch_size=1)
+        self.log('test_loss', loss, prog_bar=True, on_epoch=True, batch_size=1)
         self.cm.update(x_masked, y_masked)
         self.aucroc.update(x_masked, y_masked)
         self.f1.update(x_masked, y_masked)
@@ -74,11 +73,11 @@ class LightningGNNModel(pl.LightningModule):
 
     def on_test_epoch_end(self) -> None:
         self.cm.plot()
-        self.log('test_auc_roc', self.aucroc.compute(), prog_bar=True, on_epoch=True)
-        self.log('test_f1', self.f1.compute(), prog_bar=True, on_epoch=True)
-        self.log('test_precision', self.precision.compute(), prog_bar=True, on_epoch=True)
-        self.log('test_recall', self.recall.compute(), prog_bar=True, on_epoch=True)
+        self.log('test_auc_roc', self.aucroc.compute(), prog_bar=True, on_epoch=True, batch_size=1)
+        self.log('test_f1', self.f1.compute(), prog_bar=True, on_epoch=True, batch_size=1)
+        self.log('test_precision', self.precision.compute(), prog_bar=True, on_epoch=True, batch_size=1)
+        self.log('test_recall', self.recall.compute(), prog_bar=True, on_epoch=True, batch_size=1)
         return super().on_test_epoch_end()
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=self.learning_rate, weight_decay=self.decay)
+        return Config.optimizer(self.parameters(), lr=Config.learning_rate, weight_decay=Config.weight_decay)

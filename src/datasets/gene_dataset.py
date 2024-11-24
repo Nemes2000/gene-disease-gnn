@@ -34,6 +34,10 @@ class GeneDataset(Dataset):
         super(GeneDataset, self).__init__(root, transform, pre_transform)
 
     @property
+    def processed_dir(self):
+        return os.path.join(os.path.dirname(__file__), Config.processed_data_dir)
+
+    @property
     def raw_file_names(self):
         """ If this file exists in raw_dir, the download is not triggered.
             (The download func. is not implemented here)
