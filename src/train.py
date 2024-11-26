@@ -13,7 +13,7 @@ def callbacks():
     """
 
     model_cpkt = ModelCheckpoint(
-        monitor='val_acc',
+        monitor='val_loss',
         mode='min',
         save_top_k=1,
         save_last=True,
@@ -21,7 +21,7 @@ def callbacks():
         filename='best_model')
 
     early_stopping = EarlyStopping(
-        monitor='val_acc',
+        monitor='val_loss',
         mode='min',
         patience=10,
         verbose=True,

@@ -2,7 +2,7 @@ import wandb
 import argparse
 
 from train import train_node_classifier
-from optimalization import optimalization
+from hyperopt import optimalization
 from datasets.load_datasets import get_gtex_disgenet_dataset, get_gtex_disgenet_test_dataset
 from config import Config
 

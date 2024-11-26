@@ -5,7 +5,11 @@ from train import train_node_classifier
 
 def optimalization(dataset):
     sweep_config = {
-        'method': 'random'
+        'method': 'bayes',
+        'metric': {
+            'goal': 'minimize',
+            'name': 'val_loss'
+        }
     }
 
     parameters_dict = {
@@ -41,6 +45,7 @@ def optimalization(dataset):
     sweep_id = wandb.sweep(sweep_config, project=project_name)
 
     wandb.agent(sweep_id=sweep_id, function=wrapped_opt_train_function(dataset=dataset), count=Config.optimalization_step)
+    wandb.teardown()
 
 def wrapped_opt_train_function(dataset):
     def train_wrapper(config=None):
