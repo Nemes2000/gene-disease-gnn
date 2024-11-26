@@ -33,6 +33,11 @@ def optimalization(dataset):
             'min': 0,
             'max': 0.1
         },
+        'weight_decay': {
+            'distribution': 'uniform',
+            'min': 0.0001,
+            'max': 0.01
+        },
     }
     )
 
@@ -61,6 +66,7 @@ def optimalization_train(config=None, dataset=None):
         Config.hidden_channels = config.hidden_channels
         Config.dropout_rate = config.dropout_rate
         Config.learning_rate = config.learning_rate
+        Config.weight_decay = config.weight_decay
 
         train_node_classifier(dataset=dataset)
         
