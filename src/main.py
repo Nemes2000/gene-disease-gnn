@@ -15,6 +15,7 @@ if __name__ == "__main__":
     parser.add_argument('-model', type=str, choices=["basic"])
     parser.add_argument('-epoch', type=int)
     parser.add_argument('--opt', action='store_true', help="If given optimalization will run.")
+    parser.add_argument('-opt-step', type=int)
     parser.add_argument('--test-dataset', action='store_true', help="If given test dataset will be used.")
     args = parser.parse_args()
 
@@ -35,6 +36,9 @@ if __name__ == "__main__":
 
     if args.epoch:
         Config.epochs = args.epoch
+    
+    if args.opt_step:
+        Config.optimalization_step = args.opt_step
 
     if args.opt:
         optimalization(dataset=dataset)
