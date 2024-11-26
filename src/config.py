@@ -4,7 +4,7 @@ import os
 class Config():
     #data creataion params
     min_disease_s_gene_number = 7
-    train_test_split = 0.5
+    train_test_split = 0.8
     test_val_split = 0.5
 
     # Test dataset param

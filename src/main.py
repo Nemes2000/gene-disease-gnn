@@ -25,8 +25,10 @@ if __name__ == "__main__":
 
     if args.test_dataset:
         dataset = get_gtex_disgenet_test_dataset()
+        Config.test_dataset = True
     else:
         dataset = get_gtex_disgenet_dataset()
+        Config.test_dataset = False
 
     Config.in_channels = dataset.num_node_features
     Config.out_channels = dataset[0].y.shape[1]
