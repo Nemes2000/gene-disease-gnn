@@ -3,7 +3,7 @@ import torch
 class Config():
     #data creataion params
     min_disease_s_gene_number = 7
-    train_test_split = 0.8
+    train_test_split = 0.2
     test_val_split = 0.5
 
     # Test dataset param
@@ -33,7 +33,7 @@ class Config():
     avail_gpus = min(1, torch.cuda.device_count())
 
     #folder params
-    checkpoint_path = "../../data/saved_models/"
+    checkpoint_path = "../data/saved_models/"
     raw_data_path = "../../data/raw/"
     processed_data_dir = "../../data/processed"
     model_name = "basic"
