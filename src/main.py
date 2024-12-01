@@ -10,7 +10,6 @@ import pytorch_lightning as pl
 import os
 
 if __name__ == "__main__":
-    os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
     pl.seed_everything(42)
 
     parser = argparse.ArgumentParser()
