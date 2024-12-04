@@ -38,11 +38,8 @@ def train_node_classifier(dataset):
     trainer = pl.Trainer(
         default_root_dir=root_dir,
         callbacks=callbacks(),
-        accelerator="auto",
         devices=1,
         max_epochs=Config.epochs,
-        enable_progress_bar=False,
-        log_every_n_steps=1,
         logger=pl.loggers.WandbLogger(project=Config.wandb_project_name, log_model="all")
     ) 
     trainer.logger._default_hp_metric = None  # Optional logging argument that we don't need
