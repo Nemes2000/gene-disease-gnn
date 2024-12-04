@@ -8,3 +8,5 @@ torch-geometric==2.6.1
 torchmetrics==1.6.0
 tqdm==4.67.0
 wandb==0.18.7
+scikit-learn==1.5.2
+seaborn==0.13.2

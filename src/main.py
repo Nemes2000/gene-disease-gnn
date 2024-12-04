@@ -8,6 +8,7 @@ from config import Config
 
 import pytorch_lightning as pl
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 if __name__ == "__main__":
     pl.seed_everything(42)
@@ -21,8 +22,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     wandb.login(key=Config.wandb_api_key)
-
-    print(args)
 
     if args.test_dataset:
         dataset = get_gtex_disgenet_test_dataset()

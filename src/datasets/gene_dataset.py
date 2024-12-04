@@ -56,7 +56,6 @@ class GeneDataset(Dataset):
         pass
 
     def process(self):
-        print(self.raw_paths)
         self.genes_features = pd.read_csv(self.raw_paths[0], sep="\t")
         self.edges_features = pd.read_csv(self.raw_paths[1], sep="\t")
         self.disiese_gene_matrix = pd.read_csv(self.raw_paths[2], sep="\t")
@@ -182,7 +181,10 @@ class GeneDataset(Dataset):
         """ - Equivalent to __getitem__ in pytorch
             - Is not needed for PyG's InMemoryDataset
         """
-        graph = torch.load(os.path.join(self.processed_dir, 'graph.pt'), weights_only=False)
+        if self.test:
+            graph = torch.load(os.path.join(self.processed_dir, 'graph_test.pt'), weights_only=False)
+        else:
+            graph = torch.load(os.path.join(self.processed_dir, 'graph.pt'), weights_only=False)
 
         return graph
 

@@ -29,7 +29,7 @@ def callbacks():
     return [model_cpkt, early_stopping]
 
 def train_node_classifier(dataset):
-    node_data_loader = geom_data.DataLoader(dataset, num_workers=11, persistent_workers=True)
+    node_data_loader = geom_data.DataLoader(dataset, batch_size=1, num_workers=11, persistent_workers=True)
 
     # Create a PyTorch Lightning trainer
     root_dir = os.path.join(Config.checkpoint_path, Config.model_name)
@@ -42,7 +42,6 @@ def train_node_classifier(dataset):
         max_epochs=Config.epochs,
         logger=pl.loggers.WandbLogger(project=Config.wandb_project_name, log_model="all")
     ) 
-    trainer.logger._default_hp_metric = None  # Optional logging argument that we don't need
 
     model = LightningGNNModel(model_name=Config.model_name)
 

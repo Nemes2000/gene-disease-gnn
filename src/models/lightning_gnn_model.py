@@ -1,8 +1,8 @@
 import torch
+import tensorflow
 
 import pytorch_lightning as pl
-import seaborn as sns
-import matplotlib as plt
+import numpy as np
 
 from sklearn.metrics import confusion_matrix, f1_score, \
     accuracy_score, precision_score, recall_score, roc_auc_score, \
@@ -42,7 +42,7 @@ class LightningGNNModel(pl.LightningModule):
             mask = data.test_mask
         else:
             assert False, f"Unknown forward mode: {mode}"
-
+        
         loss = self.loss_function(x_pred[mask], data.y[mask])
         acc = (x_pred[mask].argmax(dim=-1) == data.y[mask]).sum().float() / mask.sum()
 
@@ -67,16 +67,21 @@ class LightningGNNModel(pl.LightningModule):
         x_pred_masked = x_pred[data.test_mask]
         y_masked = data.y[data.test_mask]
 
+        x_pred_binary = tensorflow.cast(x_pred_masked > 0.5, dtype=tensorflow.int32)
+        print(x_pred_masked)
+        print(x_pred_binary)
+
         self.log("test_acc", acc)
         self.log('test_loss', loss)
-        self.log(f"F1 score", f1_score(x_pred_masked, y_masked))
-        self.log(f"Accuracy", accuracy_score(x_pred_masked, y_masked))
-        self.log(f"Recall", recall_score(x_pred_masked, y_masked))
-        self.log(f"Precision", precision_score(x_pred_masked, y_masked))
-        self.log(f"ROC-AUC", roc_auc_score(x_pred_masked, y_masked))
-        self.log(f"AUPRC", average_precision_score(x_pred_masked, y_masked))
+        if len(np.unique(y_masked)) > 1:
+            self.log(f"ROC-AUC", roc_auc_score(y_masked, x_pred_binary))
 
-        cm = confusion_matrix(y_masked, x_pred_masked)
+        self.log(f"F1 score", f1_score(y_masked, x_pred_binary))
+        self.log(f"Accuracy", accuracy_score(y_masked, x_pred_binary))
+        self.log(f"Recall", recall_score(y_masked, x_pred_binary))
+        self.log(f"Precision", precision_score(y_masked, x_pred_binary))
+        self.log(f"AUPRC", average_precision_score(y_masked, x_pred_binary))
+        cm = confusion_matrix(y_masked, x_pred_binary)
         disp = ConfusionMatrixDisplay(confusion_matrix=cm)
         disp.plot().figure_.savefig('confusion_matrix.png')
 
@@ -87,12 +92,12 @@ class LightningGNNModel(pl.LightningModule):
         # self.recall.update(x_masked, y_masked)
         return loss  
 
-    def on_test_epoch_end(self) -> None:
-        self.log('test_auc_roc', self.aucroc.compute(), prog_bar=True, on_epoch=True, batch_size=1)
-        self.log('test_f1', self.f1.compute(), prog_bar=True, on_epoch=True, batch_size=1)
-        self.log('test_precision', self.precision.compute(), prog_bar=True, on_epoch=True, batch_size=1)
-        self.log('test_recall', self.recall.compute(), prog_bar=True, on_epoch=True, batch_size=1)
-        return super().on_test_epoch_end()
+    # def on_test_epoch_end(self) -> None:
+    #     self.log('test_auc_roc', self.aucroc.compute(), prog_bar=True, on_epoch=True, batch_size=1)
+    #     self.log('test_f1', self.f1.compute(), prog_bar=True, on_epoch=True, batch_size=1)
+    #     self.log('test_precision', self.precision.compute(), prog_bar=True, on_epoch=True, batch_size=1)
+    #     self.log('test_recall', self.recall.compute(), prog_bar=True, on_epoch=True, batch_size=1)
+    #     return super().on_test_epoch_end()
 
     def configure_optimizers(self):
         return Config.optimizer(self.parameters(), lr=Config.learning_rate, weight_decay=Config.weight_decay)
