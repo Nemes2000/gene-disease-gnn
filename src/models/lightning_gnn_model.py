@@ -68,8 +68,6 @@ class LightningGNNModel(pl.LightningModule):
         y_masked = data.y[data.test_mask]
 
         x_pred_binary = tensorflow.cast(x_pred_masked.cpu() > 0.5, dtype=tensorflow.int32)
-        print(x_pred_masked)
-        print(x_pred_binary)
 
         self.log("test_acc", acc)
         self.log('test_loss', loss)
