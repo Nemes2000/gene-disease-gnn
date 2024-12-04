@@ -67,20 +67,22 @@ class LightningGNNModel(pl.LightningModule):
         x_pred_masked = x_pred[data.test_mask]
         y_masked = data.y[data.test_mask]
 
-        x_pred_binary = tensorflow.cast(x_pred_masked > 0.5, dtype=tensorflow.int32)
+        x_pred_binary = tensorflow.cast(x_pred_masked.cpu() > 0.5, dtype=tensorflow.int32)
         print(x_pred_masked)
         print(x_pred_binary)
 
         self.log("test_acc", acc)
         self.log('test_loss', loss)
-        if len(np.unique(y_masked)) > 1:
-            self.log(f"ROC-AUC", roc_auc_score(y_masked, x_pred_binary))
+        y_masked_cpu = y_masked.cpu()
+        if len(np.unique(y_masked_cpu)) > 1:
+            self.log("ROC-AUC", roc_auc_score(y_masked_cpu, x_pred_binary))
 
-        self.log(f"F1 score", f1_score(y_masked, x_pred_binary))
-        self.log(f"Accuracy", accuracy_score(y_masked, x_pred_binary))
-        self.log(f"Recall", recall_score(y_masked, x_pred_binary))
-        self.log(f"Precision", precision_score(y_masked, x_pred_binary))
-        self.log(f"AUPRC", average_precision_score(y_masked, x_pred_binary))
+        self.log("F1 score", f1_score(y_masked_cpu, x_pred_binary))
+        self.log("Accuracy", accuracy_score(y_masked_cpu, x_pred_binary))
+        self.log("Recall", recall_score(y_masked_cpu, x_pred_binary))
+        self.log("Precision", precision_score(y_masked_cpu, x_pred_binary))
+        self.log("AUPRC", average_precision_score(y_masked_cpu, x_pred_binary))
+
         cm = confusion_matrix(y_masked, x_pred_binary)
         disp = ConfusionMatrixDisplay(confusion_matrix=cm)
         disp.plot().figure_.savefig('confusion_matrix.png')
