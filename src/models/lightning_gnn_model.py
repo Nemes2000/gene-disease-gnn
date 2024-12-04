@@ -83,7 +83,7 @@ class LightningGNNModel(pl.LightningModule):
         self.log("Precision", precision_score(y_masked_cpu, x_pred_binary))
         self.log("AUPRC", average_precision_score(y_masked_cpu, x_pred_binary))
 
-        cm = confusion_matrix(y_masked, x_pred_binary)
+        cm = confusion_matrix(y_masked_cpu, x_pred_binary)
         disp = ConfusionMatrixDisplay(confusion_matrix=cm)
         disp.plot().figure_.savefig('confusion_matrix.png')
 
