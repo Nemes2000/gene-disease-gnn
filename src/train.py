@@ -31,7 +31,6 @@ def callbacks():
 def train_node_classifier(dataset):
     node_data_loader = geom_data.DataLoader(dataset, batch_size=1, num_workers=11, persistent_workers=True)
 
-    # Create a PyTorch Lightning trainer
     root_dir = os.path.join(Config.checkpoint_path, Config.model_name)
     os.makedirs(root_dir, exist_ok=True)
 

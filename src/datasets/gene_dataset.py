@@ -175,7 +175,7 @@ class GeneDataset(Dataset):
         return edge_indices
 
     def len(self):
-        return self.genes.shape[0]
+        return 1
 
     def get(self, idx):
         """ - Equivalent to __getitem__ in pytorch
