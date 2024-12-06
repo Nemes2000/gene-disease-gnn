@@ -2,9 +2,11 @@ import torch
 
 class Config():
     #data creataion params
+    # If you use the test dataset set min_disease_s_gene_number to 0, and train test_split to 0.5 
     min_disease_s_gene_number = 7
     train_test_split = 0.2
     test_val_split = 0.5
+    process_files = False
 
     # Test dataset param
     test_dataset = False

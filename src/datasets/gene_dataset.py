@@ -11,7 +11,7 @@ from config import Config
 from mappers.idmapper import IdMapper
 
 class GeneDataset(Dataset):
-    def __init__(self, root, filenames, test_size, val_size, test=False, transform=None, pre_transform=None):
+    def __init__(self, root, filenames, test_size, val_size, process_files, transform=None, pre_transform=None):
         """
         root = Where the dataset should be stored. This folder is split
         into raw_dir (downloaded dataset) and processed_dir (processed data).
@@ -26,7 +26,7 @@ class GeneDataset(Dataset):
         file_1_path = os.path.normpath(file_1_path)
         file_2_path = os.path.normpath(file_2_path)
 
-        self.test = test
+        self.process_files = process_files
         self.test_size = test_size
         self.val_size = val_size
         self.filenames = [file_0_path, file_1_path, file_2_path]
@@ -46,11 +46,10 @@ class GeneDataset(Dataset):
 
     @property
     def processed_file_names(self):
-        """ If these files are found in raw_dir, processing is skipped"""
-        file_0_path = os.path.join(os.path.dirname(__file__), self.files_parent_dir+self.filenames[0])
-        file_1_path = os.path.join(os.path.dirname(__file__), self.files_parent_dir+self.filenames[1])
-        file_2_path = os.path.join(os.path.dirname(__file__), self.files_parent_dir+self.filenames[2])
-        return [file_0_path, file_1_path, file_2_path]
+        """ If these files are found in processed_dir, processing is skipped"""
+        if not self.process_files:
+            return ["graph.pt"]
+        return []
 
     def download(self):
         pass
@@ -181,10 +180,7 @@ class GeneDataset(Dataset):
         """ - Equivalent to __getitem__ in pytorch
             - Is not needed for PyG's InMemoryDataset
         """
-        if self.test:
-            graph = torch.load(os.path.join(self.processed_dir, 'graph_test.pt'), weights_only=False)
-        else:
-            graph = torch.load(os.path.join(self.processed_dir, 'graph.pt'), weights_only=False)
+        graph = torch.load(os.path.join(self.processed_dir, 'graph.pt'), weights_only=False)
 
         return graph
 

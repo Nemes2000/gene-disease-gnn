@@ -19,9 +19,13 @@ if __name__ == "__main__":
     parser.add_argument('--opt', action='store_true', help="If given optimalization will run.")
     parser.add_argument('-opt-step', type=int)
     parser.add_argument('--test-dataset', action='store_true', help="If given test dataset will be used.")
+    parser.add_argument('--process-dataset', action='store_true', help="If given dataset will be recreated.")
     args = parser.parse_args()
 
     wandb.login(key=Config.wandb_api_key)
+
+    if args.process_dataset:
+        Config.process_files = True
 
     if args.test_dataset:
         dataset = get_gtex_disgenet_test_dataset()
