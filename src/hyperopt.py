@@ -14,16 +14,7 @@ def optimalization(dataset):
 
     parameters_dict = {
         'optimizer': {
-            'values': ['adam', 'sgd', 'adamW']
-        },
-        "num_layers": {
-            "values": [10,5,2]
-        },
-        'hidden_channels': {
-            'values': [30, 20, 16]
-        },
-        "dropout_rate": {
-            "values" : [0.5, 0.3, 0.1]
+            'values': ['adam', 'adamW']
         }
     }
 
@@ -38,6 +29,21 @@ def optimalization(dataset):
             'min': 0.0001,
             'max': 0.01
         },
+        "num_layers" : {
+            'distribution': 'uniform',
+            'min': 1,
+            'max': 10
+        },
+        "hidden_channels" : {
+            'distribution': 'uniform',
+            'min': 16,
+            'max': 100
+        },
+        "dropout_rate" : {
+            'distribution': 'uniform',
+            'min': 0.01,
+            'max': 0.05
+        }
     }
     )
 
