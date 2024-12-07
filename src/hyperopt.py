@@ -20,13 +20,13 @@ def optimalization(dataset):
 
     parameters_dict.update({
         "num_layers" : {
-            'distribution': 'q_uniform_values',
+            'distribution': 'q_log_uniform_values',
             'q': 1,
             'min': 1,
             'max': 10
         },
         "hidden_channels" : {
-            'distribution': 'q_uniform_values',
+            'distribution': 'q_log_uniform_values',
             'q': 1,
             'min': 16,
             'max': 100
