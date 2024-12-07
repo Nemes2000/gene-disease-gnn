@@ -18,7 +18,6 @@ class Config():
     optimizer = torch.optim.Adam
     optimizer_map = {
         'adam': torch.optim.Adam,
-        'sgd': torch.optim.SGD,
         'adamW': torch.optim.AdamW
     }
     epochs = 1
