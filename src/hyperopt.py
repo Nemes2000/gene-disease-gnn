@@ -23,7 +23,7 @@ def optimalization(dataset):
             'distribution': 'q_log_uniform_values',
             'q': 1,
             'min': 1,
-            'max': 10
+            'max': 100
         },
         "hidden_channels" : {
             'distribution': 'q_log_uniform_values',

@@ -23,7 +23,7 @@ def callbacks():
     early_stopping = EarlyStopping(
         monitor='val_loss',
         mode='min',
-        patience=10,
+        patience=20,
         verbose=True,
     )
     return [model_cpkt, early_stopping]
