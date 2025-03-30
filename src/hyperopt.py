@@ -53,7 +53,7 @@ def optimalization(dataset):
     if Config.test_dataset:
         project_name = "gnn_test_logs"
     else:
-        project_name = "gnn_logs"
+        project_name = Config.wandb_project_name
 
     sweep_id = wandb.sweep(sweep_config, project=project_name)
 

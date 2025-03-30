@@ -11,11 +11,14 @@ from config import Config
 from mappers.idmapper import IdMapper
 
 class GeneDataset(Dataset):
-    def __init__(self, root, filenames, test_size, val_size, process_files, transform=None, pre_transform=None):
+    def __init__(self, root, filenames, test_size, val_size, process_files, transform=None, pre_transform=None, selected_disease=None):
         """
         root = Where the dataset should be stored. This folder is split
         into raw_dir (downloaded dataset) and processed_dir (processed data).
         """
+        # Selected disease for classification
+        self.selected_disease = selected_disease
+
         self.files_parent_dir = Config.raw_data_path
         file_0_path = os.path.join(os.path.dirname(__file__), self.files_parent_dir+filenames[0])
         file_1_path = os.path.join(os.path.dirname(__file__), self.files_parent_dir+filenames[1])
@@ -120,15 +123,28 @@ class GeneDataset(Dataset):
         disgenet_inverse = gene_disease_descartes_product.merge(disgenet, on=['geneId', 'diseaseId'], how='left', indicator=True)
         return disgenet_inverse[disgenet_inverse['_merge'] == 'left_only'].drop(columns='_merge')
 
+    def _create_mask_matrix(self, gene_disease_dataframe):
+        # If in the y we need only one disease
+        matrix_col = 1 if self.selected_disease else len(self.diseases)
 
-    def _create_mask_matrix(self, dataframe):
-        dataframe_for_matrix = pd.DataFrame(np.zeros((len(self.genes), len(self.diseases)),))
+        dataframe_for_matrix = pd.DataFrame(np.zeros((len(self.genes), matrix_col),))
         gene_id_to_idx = self.mapper.genes_id_to_idx_map()
         disease_id_to_idx = self.mapper.diseases_id_to_idx_map()
 
-        dataframe["geneId"] = dataframe["geneId"].map(gene_id_to_idx)
-        dataframe["diseaseId"] = dataframe["diseaseId"].map(disease_id_to_idx)
-        tuples_array = [row for row in dataframe.itertuples(index=False, name=None)]
+        # Filter out for the given disease
+        if self.selected_disease:
+            gene_disease_dataframe = gene_disease_dataframe[gene_disease_dataframe["diseaseId"] == self.selected_disease]
+        
+        gene_disease_dataframe["geneId"] = gene_disease_dataframe["geneId"].map(gene_id_to_idx)
+
+        if self.selected_disease:
+            # Because we have only one column in the result matrix
+            gene_disease_dataframe["diseaseId"] = 0
+        else:
+            gene_disease_dataframe["diseaseId"] = gene_disease_dataframe["diseaseId"].map(disease_id_to_idx)
+        
+
+        tuples_array = [row for row in gene_disease_dataframe.itertuples(index=False, name=None)]
         for row, col in tqdm(tuples_array):
             dataframe_for_matrix.loc[row, col] = 1
 

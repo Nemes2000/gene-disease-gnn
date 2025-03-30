@@ -11,12 +11,16 @@ from sklearn.metrics import confusion_matrix, f1_score, \
 from models.basic_model import BasicGNNModel
 from config import Config
 
+number_for_image = 0
+
 
 class LightningGNNModel(pl.LightningModule):
     def __init__(self, model_name):
         super().__init__()
         self.save_hyperparameters()
-        self.loss_function = torch.nn.CrossEntropyLoss()
+
+        class_weights = torch.tensor([0.1, 0.9])
+        self.loss_function = torch.nn.BCEWithLogitsLoss(pos_weight=class_weights[1])
 
         if model_name == "basic":
             self.model = BasicGNNModel()
@@ -31,19 +35,22 @@ class LightningGNNModel(pl.LightningModule):
 
     def forward(self, data, mode="train"):
         x, edge_index, edge_weight = data.x, data.edge_index, data.edge_weight
-        x_pred = self.model(x, edge_index, edge_weight)
+        x_pred = self.model.forward(x, edge_index, edge_weight)
+
 
         # Only calculate the loss on the nodes corresponding to the mask
         if mode == "train":
             mask = data.train_mask
         elif mode == "val":
-            mask = data.val_mask
+            mask = data.test_mask
         elif mode == "test":
             mask = data.test_mask
         else:
             assert False, f"Unknown forward mode: {mode}"
         
-        loss = self.loss_function(x_pred[mask], data.y[mask])
+        print(x_pred[mask].unsqueeze(1).shape, data.y[mask].shape)
+
+        loss = self.loss_function(x_pred[mask].unsqueeze(1), data.y[mask].unsqueeze(1))
         acc = (x_pred[mask].argmax(dim=-1) == data.y[mask]).sum().float() / mask.sum()
 
         if mode == "test":
@@ -63,6 +70,7 @@ class LightningGNNModel(pl.LightningModule):
         return loss
 
     def test_step(self, data):
+        global number_for_image
         loss, acc, x_pred = self.forward(data, mode="test")
         x_pred_masked = x_pred[data.test_mask]
         y_masked = data.y[data.test_mask]
@@ -83,8 +91,8 @@ class LightningGNNModel(pl.LightningModule):
 
         cm = confusion_matrix(y_masked_cpu, x_pred_binary)
         disp = ConfusionMatrixDisplay(confusion_matrix=cm)
-        disp.plot().figure_.savefig('confusion_matrix.png')
-
+        disp.plot().figure_.savefig(f'results/matrices/confusion_matrix_{number_for_image}.png')
+        number_for_image += 1
         # self.cm.update(x_masked, y_masked)
         # self.aucroc.update(x_masked, y_masked)
         # self.f1.update(x_masked, y_masked)
