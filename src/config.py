@@ -3,11 +3,12 @@ import torch
 class Config():
     #data creataion params
     # If you use the test dataset set min_disease_s_gene_number to 0, and train test_split to 0.5 
-    min_disease_s_gene_number = 0
+    min_disease_s_gene_number = 10
+    min_gene_s_disease_number = 3
     test_size = 0.2
     val_size = 0.0
-    train_test_split = val_size + test_size
-    test_val_split = test_size / (test_size + val_size)
+    train_test_split = 0.2
+    test_val_split = 1
     process_files = False
 
     # Test dataset param
@@ -48,3 +49,9 @@ class Config():
     def set_train_val_test_dataset_size(self, test_size, val_size):
         self.train_test_split = val_size + test_size
         self.test_val_split = test_size / (test_size + val_size)
+
+
+from enum import Enum
+class ModelTypes(str, Enum):
+    BASIC = "basic"
+    CLS_WEIGHT = "cls_weight"

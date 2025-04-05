@@ -23,7 +23,8 @@ def callbacks():
     early_stopping = EarlyStopping(
         monitor='val_loss',
         mode='min',
-        patience=20,
+        min_delta = 0.01,
+        patience=10,
         verbose=True,
     )
     return [model_cpkt, early_stopping]
@@ -48,8 +49,6 @@ def train_node_classifier(dataset):
     model = LightningGNNModel.load_from_checkpoint(trainer.checkpoint_callback.best_model_path)
 
     # Test best model on the test set
-    test_result = trainer.test(model, dataloaders=node_data_loader)
-    result = {"test": test_result[0]["test_acc"]}
-    return model, result
+    trainer.test(model, dataloaders=node_data_loader)
       
       

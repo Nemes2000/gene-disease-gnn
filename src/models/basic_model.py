@@ -21,7 +21,8 @@ class BasicGNNModel(nn.Module):
                 nn.Dropout(Config.dropout_rate),
             ]
             in_channels = hidden_out_channels
-        layers += [gnn_layer(in_channels=in_channels, out_channels=Config.out_channels), nn.Sigmoid()]
+        
+        layers += [gnn_layer(in_channels=in_channels, out_channels=Config.out_channels)]
         self.layers = nn.ModuleList(layers)
 
     def forward(self, x, edge_index, edge_weight):
