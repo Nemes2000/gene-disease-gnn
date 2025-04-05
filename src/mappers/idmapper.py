@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 from config import Config
 
@@ -6,7 +7,10 @@ class IdMapper():
     sorted_diseases = []
     sorted_genes = []
 
+    #Disease file is eqvivalent to Disgenet processed file!
     def __init__(self, gene_file, disease_file):
+        self.disease_file = disease_file
+
         genes = pd.read_csv(gene_file, sep="\t")
         self.genes = genes["genes"].sort_values().unique()
 
@@ -25,3 +29,13 @@ class IdMapper():
 
     def genes_id_to_idx_map(self):
         return { item: idx  for idx, item in enumerate(self.genes)}
+    
+    def genes_id_to_idx_map_by_gene_disease_num(self):
+        if Config.min_gene_s_disease_number is not None:
+            genes = pd.read_csv(self.disease_file, sep="\t")
+            genes = genes.groupby("geneId").filter(lambda x: len(x) > Config.min_gene_s_disease_number)
+            u_genes = genes["geneId"].sort_values().unique()
+            full_map = self.genes_id_to_idx_map()
+            return { key: value  for key, value in full_map.items() if key in u_genes }
+        else:
+            return self.genes_id_to_idx_map()

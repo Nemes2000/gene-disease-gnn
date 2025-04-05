@@ -11,14 +11,11 @@ from config import Config
 from mappers.idmapper import IdMapper
 
 class GeneDataset(Dataset):
-    def __init__(self, root, filenames, test_size, val_size, process_files, transform=None, pre_transform=None, selected_disease=None):
+    def __init__(self, root, filenames, test_size, val_size, process_files, transform=None, pre_transform=None):
         """
         root = Where the dataset should be stored. This folder is split
         into raw_dir (downloaded dataset) and processed_dir (processed data).
         """
-        # Selected disease for classification
-        self.selected_disease = selected_disease
-
         self.files_parent_dir = Config.raw_data_path
         file_0_path = os.path.join(os.path.dirname(__file__), self.files_parent_dir+filenames[0])
         file_1_path = os.path.join(os.path.dirname(__file__), self.files_parent_dir+filenames[1])
@@ -70,12 +67,23 @@ class GeneDataset(Dataset):
         edge_index = self._get_adjacency_info(self.edges_features)
 
         y = self._create_mask_matrix(self.disiese_gene_matrix.copy()).to(torch.float32)
+
+        #Save diseaseId and idx mapp list
+        disease_id_to_idx = self.mapper.diseases_id_to_idx_map()
+        df = pd.DataFrame({key: [value] for key, value in disease_id_to_idx.items()})
+        df.to_csv("results/disease_id_to_idx.csv", index=False, sep=",")
+
+        print("Creating train, val, test masks ...")
         train_mask, validation_mask, test_mask = self._get_train_val_test_mask(self.disiese_gene_matrix.copy())
+        print("Creating train, val, test masks DONE!")
 
         data = Data(x=node_feats,
                     edge_index=edge_index,
                     edge_weight=edge_feats,
-                    test_mask=test_mask, val_mask=validation_mask, train_mask=train_mask, y=y)
+                    test_mask=test_mask, 
+                    val_mask=validation_mask, 
+                    train_mask=train_mask, 
+                    y=y)
 
         torch.save(data, os.path.join(self.processed_dir, 'graph.pt'))
 
@@ -124,27 +132,18 @@ class GeneDataset(Dataset):
         return disgenet_inverse[disgenet_inverse['_merge'] == 'left_only'].drop(columns='_merge')
 
     def _create_mask_matrix(self, gene_disease_dataframe):
-        # If in the y we need only one disease
-        matrix_col = 1 if self.selected_disease else len(self.diseases)
-
-        dataframe_for_matrix = pd.DataFrame(np.zeros((len(self.genes), matrix_col),))
-        gene_id_to_idx = self.mapper.genes_id_to_idx_map()
+        gene_num = len(self.mapper.genes_id_to_idx_map())
         disease_id_to_idx = self.mapper.diseases_id_to_idx_map()
+        dataframe_for_matrix = pd.DataFrame(np.zeros(( gene_num, len(disease_id_to_idx)),))
 
-        # Filter out for the given disease
-        if self.selected_disease:
-            gene_disease_dataframe = gene_disease_dataframe[gene_disease_dataframe["diseaseId"] == self.selected_disease]
-        
+        # Filter out for the given diseases
+        gene_id_to_idx = self.mapper.genes_id_to_idx_map_by_gene_disease_num()
         gene_disease_dataframe["geneId"] = gene_disease_dataframe["geneId"].map(gene_id_to_idx)
-
-        if self.selected_disease:
-            # Because we have only one column in the result matrix
-            gene_disease_dataframe["diseaseId"] = 0
-        else:
-            gene_disease_dataframe["diseaseId"] = gene_disease_dataframe["diseaseId"].map(disease_id_to_idx)
+        gene_disease_dataframe["diseaseId"] = gene_disease_dataframe["diseaseId"].map(disease_id_to_idx)
+        gene_disease_dataframe = gene_disease_dataframe.dropna()
         
-
         tuples_array = [row for row in gene_disease_dataframe.itertuples(index=False, name=None)]
+
         for row, col in tqdm(tuples_array):
             dataframe_for_matrix.loc[row, col] = 1
 
