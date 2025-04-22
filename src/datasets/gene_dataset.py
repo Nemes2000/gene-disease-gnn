@@ -72,6 +72,7 @@ class GeneDataset(Dataset):
         disease_id_to_idx = self.mapper.diseases_id_to_idx_map()
         df = pd.DataFrame({key: [value] for key, value in disease_id_to_idx.items()})
         df.to_csv("results/disease_id_to_idx.csv", index=False, sep=",")
+        #
 
         print("Creating train, val, test masks ...")
         train_mask, validation_mask, test_mask = self._get_train_val_test_mask(self.disiese_gene_matrix.copy())

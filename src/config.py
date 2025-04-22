@@ -10,15 +10,17 @@ class Config():
     train_test_split = 0.2
     test_val_split = 1
     process_files = False
+    pos_class_weight = 1
+    disease_idx = None
 
     # Test dataset param
     test_dataset = False
 
     #train params
-    learning_rate = 0.01
-    weight_decay = 5e-4
+    learning_rate = 0.03682
+    weight_decay = 0.00198
     optimalization_step = 1
-    optimizer = torch.optim.Adam
+    optimizer = torch.optim.AdamW
     optimizer_map = {
         'adam': torch.optim.Adam,
         'adamW': torch.optim.AdamW
@@ -26,10 +28,10 @@ class Config():
     epochs = 1
 
     #layer params
-    dropout_rate = 0.2
+    dropout_rate = 0.041454
     num_classes = 2
-    hidden_channels = 16
-    num_layers = 2
+    hidden_channels = 39
+    num_layers = 1
     in_channels = 0 # will receave from dataset
     out_channels = 0 # will receave from dataset
     

@@ -24,7 +24,7 @@ def callbacks():
         monitor='val_loss',
         mode='min',
         min_delta = 0.01,
-        patience=10,
+        patience=25,
         verbose=True,
     )
     return [model_cpkt, early_stopping]
