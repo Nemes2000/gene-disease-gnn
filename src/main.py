@@ -47,7 +47,9 @@ if __name__ == "__main__":
         disease_id = dataset.mapper.diseases_id_to_idx_map()[args.disease]
         Config.disease_idx = disease_id
         Config.pos_class_weight = dataset[0].train_mask[:,disease_id].sum() / dataset[0].y[:,disease_id].sum()
-    print(disease_id, Config.pos_class_weight)
+        print(disease_id, Config.pos_class_weight)
+        print("sum pos: ",dataset[0].train_mask[:,disease_id].sum())
+        print("y shape: ",dataset[0].y.shape)
 
     Config.test_dataset = False
     Config.in_channels = dataset.num_node_features

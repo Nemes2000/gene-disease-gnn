@@ -48,6 +48,16 @@ class Config():
     wandb_api_key = "e1f878235d3945d4141f9f8e5af41d712fca6eba"
     wandb_project_name = "gnn_single_disease"
 
+    #Multitask learning params
+    pretrain_epochs = 5
+    weight_emb_dim = 1000
+    weigth_act_type = "sigmoid"
+    weight_lr = 0.005
+    max_lr = 1e-3
+    clip = 0.5
+    n_fold = 1
+
+
     def set_train_val_test_dataset_size(self, test_size, val_size):
         self.train_test_split = val_size + test_size
         self.test_val_split = test_size / (test_size + val_size)
@@ -57,3 +67,4 @@ from enum import Enum
 class ModelTypes(str, Enum):
     BASIC = "basic"
     CLS_WEIGHT = "cls_weight"
+    MULTITASK = "multitask"

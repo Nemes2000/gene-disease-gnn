@@ -40,6 +40,8 @@ def train_node_classifier(dataset):
         callbacks=callbacks(),
         devices=1,
         max_epochs=Config.epochs,
+        gradient_clip_val=Config.clip,
+        gradient_clip_algorithm='norm', # calc L2 norm
         logger=pl.loggers.WandbLogger(project=Config.wandb_project_name, log_model="all")
     ) 
 
