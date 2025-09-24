@@ -295,25 +295,29 @@ class LightningGNNModel(pl.LightningModule):
 
         print("Creating pr disease statisctic...")
         
-        x_pred_masked = embeding[:, Config.pr_disease_idx]
         y_masked = data.y[:, Config.pr_disease_idx].cpu()
 
-        x_pred_binary = torch.where(x_pred_masked > 0.5, torch.tensor(1, dtype=torch.int32), torch.tensor(0, dtype=torch.int32))
-        cm = confusion_matrix(y_masked, x_pred_binary)
+        y_true = data.y[:, Config.pr_disease_idx].detach().cpu().numpy()
+        y_pred = (embeding[:, Config.pr_disease_idx] > 0.5).int().detach().cpu().numpy()
+
+        cm = confusion_matrix(y_true, y_pred)
+
+        # y_pred = torch.where(x_pred_masked > 0.5, torch.tensor(1, dtype=torch.int32), torch.tensor(0, dtype=torch.int32))
+        # cm = confusion_matrix(y_masked, y_pred)
 
         auc = 0
         if len(np.unique(y_masked)) > 1:
-            auc = roc_auc_score(y_masked, x_pred_binary)
+            auc = roc_auc_score(y_masked, y_pred)
         
         df = pd.DataFrame({"disease_idx": [Config.pr_disease_idx], 
-                           "acc": [accuracy_score(y_masked, x_pred_binary)], 
-                           "f1": [f1_score(y_masked, x_pred_binary)], 
-                           "recal": [recall_score(y_masked, x_pred_binary)], 
-                           "precision": [precision_score(y_masked, x_pred_binary)], 
+                           "acc": [accuracy_score(y_masked, y_pred)], 
+                           "f1": [f1_score(y_masked, y_pred)], 
+                           "recal": [recall_score(y_masked, y_pred)], 
+                           "precision": [precision_score(y_masked, y_pred)], 
                            "auc":[auc],
-                           "auprc": [average_precision_score(y_masked, x_pred_binary)], 
+                           "auprc": [average_precision_score(y_masked, y_pred)], 
                            "cm": [" ".join(map(str, cm.flatten()))], 
-                           "x_sum": [ x_pred_binary.sum().item()], 
+                           "x_sum": [ y_pred.sum().item()], 
                            "y_sum": [y_masked.sum().item()]})
             
         df.to_csv(f"results/multitask/{Config.pr_disease_idx}_classification.csv", index=False, sep=",")
