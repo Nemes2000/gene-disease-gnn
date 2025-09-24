@@ -10,7 +10,7 @@ class MultiTaskGNNModel(nn.Module):
         self.gnn = gnn  # shared encoders
 
         #TODO: create complex layers for private layers
-        private_layer = nn.ModuleList([
+        private_layer = nn.Sequential([
             nn.Linear(Config.out_channels, 2000),
             nn.ReLU(inplace=True), 
             nn.Dropout(Config.dropout_rate), 
