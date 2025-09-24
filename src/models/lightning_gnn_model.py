@@ -296,7 +296,7 @@ class LightningGNNModel(pl.LightningModule):
         print("Creating pr disease statisctic...")
         
         x_pred_masked = embeding[:, Config.pr_disease_idx]
-        y_masked = data.y[:, Config.pr_disease_idx]
+        y_masked = data.y[:, Config.pr_disease_idx].cpu()
 
         x_pred_binary = torch.where(x_pred_masked > 0.5, torch.tensor(1, dtype=torch.int32), torch.tensor(0, dtype=torch.int32))
         cm = confusion_matrix(y_masked, x_pred_binary)
