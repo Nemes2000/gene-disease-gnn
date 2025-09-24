@@ -1,6 +1,6 @@
 from sklearn.metrics import accuracy_score
 from torch import nn
-import torch
+import copy
 
 from config import Config
 
@@ -10,8 +10,20 @@ class MultiTaskGNNModel(nn.Module):
         self.gnn = gnn  # shared encoders
 
         #TODO: create complex layers for private layers
-        self.pr_layer = nn.Linear(Config.out_channels, Config.out_channels)
-        self.aux_layers = nn.ModuleList([nn.Linear(Config.out_channels, Config.out_channels) for _ in range(aux_tasks_num)])
+        private_layer = nn.ModuleList([
+            nn.Linear(Config.out_channels, 2000),
+            nn.ReLU(inplace=True), 
+            nn.Dropout(Config.dropout_rate), 
+            nn.Linear(2000, 1500),
+            nn.ReLU(inplace=True), 
+            nn.Dropout(Config.dropout_rate),
+            nn.Linear(1500, Config.out_channels),
+            nn.ReLU(inplace=True), 
+            nn.Dropout(Config.dropout_rate),
+            ])
+
+        self.pr_layer = private_layer
+        self.aux_layers = nn.ModuleList([copy.deepcopy(private_layer) for _ in range(aux_tasks_num)])
         self.classifier =  nn.BCEWithLogitsLoss()
         
     def forward(self, data, mode = "train", is_pretrain = False):
