@@ -2,6 +2,7 @@
 **/wandb
 **/gene-disease-test
 /results
+/GPT_GNN
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

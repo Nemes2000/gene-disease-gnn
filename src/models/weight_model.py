@@ -1,4 +1,5 @@
 from torch import nn
+import torch.nn.functional as F
 
 class Weight(nn.Module):
     def __init__(self, in_channel, hidden, out_channel, act_type='sigmoid'):

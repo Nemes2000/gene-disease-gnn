@@ -18,7 +18,7 @@ def get_cos(params, mt_gnn, optimizer, share_param_name, cos_, loss_pr_mean, los
         aux_share_grad = record_grad([mt_gnn], share_param_name)
         aux_grad_flat = torch.cat([p.clone().flatten() for n, p in aux_share_grad.items()])
 
-        pr_aux_cos = cos_(pr_grad_flat.view(1, -1), aux_grad_flat.view(1, -1))
+        pr_aux_cos = max(cos_(pr_grad_flat.view(1, -1), aux_grad_flat.view(1, -1)), torch.tensor(0.0))
         pr_aux_s_cos.append(pr_aux_cos)
 
     return pr_aux_s_cos

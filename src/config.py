@@ -46,17 +46,18 @@ class Config():
 
     #wwandb params
     wandb_api_key = "e1f878235d3945d4141f9f8e5af41d712fca6eba"
-    wandb_project_name = "gnn_single_disease"
+    wandb_project_name = "gnn_multitask"
 
     #Multitask learning params
+    pr_disease_idx = None
+    aux_disease_idxs = []
+    aux_task_num = 0
     pretrain_epochs = 5
     weight_emb_dim = 1000
     weigth_act_type = "sigmoid"
     weight_lr = 0.005
     max_lr = 1e-3
     clip = 0.5
-    n_fold = 1
-
 
     def set_train_val_test_dataset_size(self, test_size, val_size):
         self.train_test_split = val_size + test_size

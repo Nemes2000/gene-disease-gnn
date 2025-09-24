@@ -1,6 +1,4 @@
-import statistics
 import torch
-
 import pytorch_lightning as pl
 import pandas as pd
 import numpy as np
@@ -15,7 +13,7 @@ from models.utils import clean_param_name, get_cos
 from models.weight_model import Weight
 
 class LightningGNNModel(pl.LightningModule):
-    def __init__(self, model_name, pr_task: str, aux_tasks: list[str]):
+    def __init__(self, model_name):
         super().__init__()
         self.save_hyperparameters()
         self.model_name = model_name
@@ -28,8 +26,8 @@ class LightningGNNModel(pl.LightningModule):
             self.loss_function = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)#FOR every disease --> 
             self.model = BasicGNNModel()
         elif model_name == ModelTypes.MULTITASK:
-            self.mt_gnn = MultiTaskGNNModel()
-            self.mt_gnn_meta = MultiTaskGNNModel()
+            self.mt_gnn = MultiTaskGNNModel(gnn=BasicGNNModel(), aux_tasks_num=Config.aux_task_num)
+            self.mt_gnn_meta = MultiTaskGNNModel(gnn=BasicGNNModel(), aux_tasks_num=Config.aux_task_num)
             self.cos_ = torch.nn.CosineSimilarity()
             
             # weigth model, optimizer_v is not saved in the checkpoint !!!
@@ -40,14 +38,16 @@ class LightningGNNModel(pl.LightningModule):
             self.params = self.mt_gnn.parameters()
             self.optimizer = torch.optim.AdamW(self.params, weight_decay = 1e-2, eps=1e-06, lr = Config.max_lr)
             self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer, T_max= Config.epochs, eta_min=1e-6)
-            self.scheduler_meta = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer_meta, T_max=Config.epochs, eta_min=1e-6)
 
             # wont be saved in the checkpoint
             self.params_meta = self.mt_gnn_meta.parameters()
             self.optimizer_meta = torch.optim.AdamW(self.params_meta, weight_decay = 1e-2, eps=1e-06, lr = Config.max_lr)
+            self.scheduler_meta = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer_meta, T_max=Config.epochs, eta_min=1e-6)
             
             self.unused_params_cleared = False
             self.clear_unused_meta_params = False
+            self.train_step_meta = 0
+            self.aux_cos_df = pd.DataFrame(columns=["epoch", "aux_idx", "cos", "weight"])
             self.get_model_params()
 
     def basic_forward(self, data, mode="train"):
@@ -90,68 +90,74 @@ class LightningGNNModel(pl.LightningModule):
         
         loss_pr_meta = 0 
         pr_aux_s_cos = 0
-        for _ in range(Config.n_fold):
-            # meta models are the copy of original ones
-            self.mt_gnn_meta.load_state_dict(self.mt_gnn.state_dict())
+        # meta models are the copy of original ones
+        self.mt_gnn_meta.load_state_dict(self.mt_gnn.state_dict())
 
-            # loss per example => reduce = false
-            loss_pr, loss_aux_s = self.mt_gnn_meta.forward(data, mode)
+        # loss per example => reduce = false
+        loss_pr, loss_aux_s = self.mt_gnn_meta.forward(data, mode)
 
-            # for log
-            loss_pr_mean = loss_pr.mean()
-            loss_aux_s_mean = [loss_aux.mean() for loss_aux in loss_aux_s]
+        # for log
+        loss_pr_mean = loss_pr.mean()
+        loss_aux_s_mean = [loss_aux.mean() for loss_aux in loss_aux_s]
 
-
-            # clears the unused meta params
-            if not self.clear_unused_meta_params:
-                self.optimizer_meta.zero_grad()
-                loss_meta = loss_pr_mean + sum(loss_aux_s_mean)
-                loss_meta.backward(retain_graph=True)
-                clean_param_name([self.mt_gnn_meta], self.share_param_name)
-                clean_param_name([self.mt_gnn_meta] , self.private_param_name)
-                self.clear_unused_meta_params = True
-
-            pr_aux_s_cos = get_cos(self.params_meta, self.mt_gnn_meta, self.optimizer_meta, self.share_param_name, self.cos_, loss_pr_mean, loss_aux_s_mean)
-
-            # embeddings for v-net
-            loss_pr_emb = torch.stack((loss_pr, \
-                    torch.ones([len(loss_pr)], device=loss_pr.device), \
-                    torch.zeros([len(loss_pr)], device=loss_pr.device), \
-                    torch.zeros([len(loss_pr)], device=loss_pr.device), \
-                    torch.full([len(loss_pr)], 1.0, device=loss_pr.device),
-                ))
-            
-            loss_aux_s_emb = [torch.stack((loss_aux, \
-                    torch.zeros([len(loss_aux)], device=loss_pr.device), \
-                    torch.zeros([len(loss_aux)], device=loss_pr.device), \
-                    torch.ones([len(loss_aux)], device=loss_pr.device), \
-                    torch.full([len(loss_aux)], pr_aux_s_cos[idx].item(), device=loss_pr.device)
-                )).transpose(1,0)
-                for idx, loss_aux in enumerate(loss_aux_s)]
-
-            loss_pr_emb = loss_pr_emb.transpose(1,0)
-
-            # compute weight
-            v_pr = self.vnet(loss_pr_emb)
-            v_aux_s = [self.vnet(loss_aux_emb) for loss_aux_emb in loss_aux_s_emb]
-
-            # compute loss
-            loss_pr_avg = (loss_pr * v_pr).mean()
-            loss_aux_avg_s = [(loss_aux * v_aux).mean() for loss_aux, v_aux in zip(loss_aux_s, v_aux_s)]
-            loss_meta = loss_pr_avg  + sum(loss_aux_avg_s)
-
-            # one step update of model parameter (fake) (Eq.6)
+        # clears the unused meta params
+        if not self.clear_unused_meta_params:
             self.optimizer_meta.zero_grad()
-            loss_meta.backward()
-            torch.nn.utils.clip_grad_norm_(self.params_meta, Config.clip)
-            self.optimizer_meta.step()
-            train_step_meta += 1
-            self.scheduler_meta.step(train_step_meta)
+            loss_meta = loss_pr_mean + sum(loss_aux_s_mean)
+            loss_meta.backward(retain_graph=True)
+            clean_param_name([self.mt_gnn_meta], self.share_param_name)
+            clean_param_name([self.mt_gnn_meta] , self.private_param_name)
+            self.clear_unused_meta_params = True
 
-            # primary loss with updated parameter (Eq.7)
-            loss_pr_meta += self.mt_gnn_meta.forward(data, mode)
+        pr_aux_s_cos = get_cos(self.params_meta, self.mt_gnn_meta, self.optimizer_meta, self.share_param_name, self.cos_, loss_pr_mean, loss_aux_s_mean)
 
-        # in each batch
+        # embeddings for v-net
+        _loss_pr = loss_pr.unsqueeze(0)
+        loss_pr_emb = torch.stack((
+            _loss_pr,
+            torch.ones_like(_loss_pr),
+            torch.zeros_like(_loss_pr),
+            torch.zeros_like(_loss_pr),
+            torch.full_like(_loss_pr, 1.0),
+        )).transpose(1,0)
+
+        
+        loss_aux_s_emb = []
+        for idx, loss_aux in enumerate(loss_aux_s):
+            loss_aux = loss_aux.unsqueeze(0)  # shape: [1]
+
+            emb = torch.stack([
+                loss_aux,
+                torch.ones_like(loss_aux),
+                torch.zeros_like(loss_aux),
+                torch.zeros_like(loss_aux),
+                torch.full_like(loss_aux, pr_aux_s_cos[idx].item())
+            ], dim=0)  # shape: [5, N]
+
+            # shape: [N, 5]
+            emb = emb.transpose(1, 0)
+            loss_aux_s_emb.append(emb)
+
+        # compute weight
+        v_pr = self.vnet(loss_pr_emb)
+        v_aux_s = [self.vnet(loss_aux_emb) for loss_aux_emb in loss_aux_s_emb]
+
+        # compute loss
+        loss_pr_avg = (loss_pr * v_pr).mean()
+        loss_aux_avg_s = [(loss_aux * v_aux).mean() for loss_aux, v_aux in zip(loss_aux_s, v_aux_s)]
+        loss_meta = loss_pr_avg  + sum(loss_aux_avg_s)
+
+        # one step update of model parameter (fake) (Eq.6)
+        self.optimizer_meta.zero_grad()
+        loss_meta.backward(retain_graph=True)
+        torch.nn.utils.clip_grad_norm_(self.params_meta, Config.clip)
+        self.optimizer_meta.step()
+        self.train_step_meta += 1
+        self.scheduler_meta.step(self.train_step_meta)
+
+        # primary loss with updated parameter (Eq.7)
+        _loss_pr_meta, _ = self.mt_gnn_meta.forward(data, mode)
+        loss_pr_meta += _loss_pr_meta
 
         # backward and update v-net params (Eq.9)
         self.optimizer_v.zero_grad()
@@ -165,33 +171,41 @@ class LightningGNNModel(pl.LightningModule):
         loss_pr_mean = loss_pr.mean()
         loss_aux_s_mean = [loss_aux.mean() for loss_aux in loss_aux_s]
         if not self.unused_params_cleared:
+            self.optimizer.zero_grad()
             loss = loss_pr_mean + sum(loss_aux_s_mean)
             loss.backward(retain_graph=True)
             clean_param_name([self.mt_gnn], self.share_param_name)
             clean_param_name([self.mt_gnn], self.private_param_name)
-            self.optimizer.zero_grad()
             self.unused_params_cleared = True
 
         pr_aux_s_cos = get_cos(self.params, self.mt_gnn, self.optimizer, self.share_param_name, self.cos_, loss_pr_mean, loss_aux_s_mean)
 
-        for c in pr_aux_s_cos:
-            print('aux cos: %f'%(c.item()))
-
         # embeddings for v-net
         # shape = (5, batch size)   
-        loss_pr_emb = torch.stack((loss_pr, \
-                    torch.ones([len(loss_pr)], device=loss_pr.device), \
-                    torch.zeros([len(loss_pr)], device=loss_pr.device), \
-                    torch.zeros([len(loss_pr)], device=loss_pr.device), \
-                    torch.full([len(loss_pr)], 1.0, device=loss_pr.device),
-                ))
-        loss_aux_s_emb = [torch.stack((loss_aux, \
-                    torch.zeros([len(loss_aux)], device=loss_pr.device), \
-                    torch.zeros([len(loss_aux)], device=loss_pr.device), \
-                    torch.ones([len(loss_aux)], device=loss_pr.device), \
-                    torch.full([len(loss_aux)], pr_aux_s_cos[idx].item(), device=loss_pr.device)
-                )).transpose(1,0)
-                for idx, loss_aux in enumerate(loss_aux_s)]
+        _loss_pr = loss_pr.unsqueeze(0)
+        loss_pr_emb = torch.stack((
+            _loss_pr,
+            torch.ones_like(_loss_pr),
+            torch.zeros_like(_loss_pr),
+            torch.zeros_like(_loss_pr),
+            torch.full_like(_loss_pr, 1.0),
+        ))
+            
+        loss_aux_s_emb = []
+        for idx, loss_aux in enumerate(loss_aux_s):
+            loss_aux = loss_aux.unsqueeze(0)  # shape: [1]
+
+            emb = torch.stack([
+                loss_aux,
+                torch.ones_like(loss_aux),
+                torch.zeros_like(loss_aux),
+                torch.zeros_like(loss_aux),
+                torch.full_like(loss_aux, pr_aux_s_cos[idx].item())
+            ], dim=0)  # shape: [5, N]
+
+            # shape: [N, 5]
+            emb = emb.transpose(1, 0)
+            loss_aux_s_emb.append(emb)
         
         # embeddings for v-net
         #shape = (batch size, 5)
@@ -202,14 +216,21 @@ class LightningGNNModel(pl.LightningModule):
             v_pr = self.vnet(loss_pr_emb)
             v_aux_s = [self.vnet(loss_aux_emb) for loss_aux_emb in loss_aux_s_emb]
 
+        for c, idx, w in zip(pr_aux_s_cos, Config.aux_disease_idxs, v_aux_s):
+            print(f'{self.current_epoch} - aux cos {idx}: %f'%(c.item()), 'weight: %f'%(w.item()))
+            self.aux_cos_df.loc[len(self.aux_cos_df)] = {"epoch": self.current_epoch, "aux_idx": idx, "cos": c.item(), "weight": w.item()}
+
         # compute loss
         loss_pr_avg = (loss_pr * v_pr).mean()
         loss_aux_avg_s = [(loss_aux * v_aux).mean() for loss_aux, v_aux in zip(loss_aux_s, v_aux_s)]
         loss_pr_avg_weighted = loss_pr.mean()
-        loss_aux_avg_weighted = statistics.mean(loss_aux_s.mean())
+        loss_aux_avg_weighted = torch.stack([l.mean() for l in loss_aux_s]).mean()
 
-        print(("Train Loss Pr: %.2f  Train Loss Aux: %.2f  Pr_Weight_Mean: %.4f Aux_Weight_Mean: %.4f Pr_Weight_Std: %.4f Aux_Weight_Std: %.4f ") %
-                (loss_pr_avg_weighted, loss_aux_avg_weighted, v_pr.mean().item(), v_aux_s.mean().item(), v_pr.std().item(), v_aux_s.std().item()))
+        v_aux_s_tensor = torch.tensor(v_aux_s)
+        v_aux_s_mean = v_aux_s_tensor.mean().item()
+        v_aux_s_std = v_aux_s_tensor.std().item()
+        print(("Train Loss Pr: %.2f  Train Loss Aux: %.2f  Pr_Weight_Mean: %.4f Aux_Weight_Mean: %.4f Aux_Weight_Std: %.4f ") %
+                (loss_pr_avg_weighted, loss_aux_avg_weighted, v_pr.mean().item(), v_aux_s_mean, v_aux_s_std))
 
         loss = loss_pr_avg + sum(loss_aux_avg_s)
         # train_pr_losses += [loss_pr_avg_weighted.cpu().detach().tolist()]
@@ -223,13 +244,15 @@ class LightningGNNModel(pl.LightningModule):
         # self.train_step += 1
         # self.scheduler.step(self.train_step)
 
-        return loss, acc, x_pred
+        return loss
     
     def get_model_params(self):
-        self.private_param_name = [p[0] for p in self.mt_gnn.named_parameters() if 'aux_classifiers' in p[0] and p[1].requires_grad]
-        self.share_param_name = []
+        self.private_param_name = [
+            name for name, param in self.mt_gnn.named_parameters()
+            if ('aux_layers' in name or 'pr_layer' in name) and param.requires_grad
+        ]
 
-        #TODO: most a shared-be benne van a pr taskhoz tartozó classifier is, miért????????????? => eredetileg is
+        self.share_param_name = []
         for n, p in self.mt_gnn.named_parameters():
             if n not in self.private_param_name and p.requires_grad:
                 self.share_param_name.append(n)
@@ -239,35 +262,64 @@ class LightningGNNModel(pl.LightningModule):
             if self.current_epoch < Config.pretrain_epochs:
                 loss = self.mt_gnn.forward(data, mode="train", is_pretrain=True)
             else: 
-                loss, acc = self.multitask_forward(data)
+                loss = self.multitask_forward(data)
         else:
-            loss, acc = self.basic_forward(data, mode="train")
+            loss = self.basic_forward(data, mode="train")
 
-        self.log('train_loss', loss, prog_bar=True, on_epoch=True)
-        self.log('train_acc', acc, prog_bar=True, on_epoch=True)
         return loss
 
     def validation_step(self, data):
         if self.model_name == ModelTypes.MULTITASK:
-            loss, acc = self.multitask_forward(data, mode="val")
+            pr_loss, _ = self.mt_gnn(data, mode="val")
+            self.log("val_loss", pr_loss)
+            return pr_loss
         else:
             loss, acc = self.basic_forward(data, mode="val")
 
-        self.log("val_acc", acc)
-        self.log("val_loss", loss)
-        return loss
-    
+            self.log("val_acc", acc)
+            self.log("val_loss", loss)
+
+            return loss
+         
     def test_step(self, data):
         if self.model_name == ModelTypes.BASIC:
             return self.basic_test_step(data)
         elif self.model_name == ModelTypes.CLS_WEIGHT:
             return self.cls_test_step(data)
         elif self.model_name == ModelTypes.MULTITASK:
+            self.aux_cos_df.to_csv(f"results/multitask/{Config.pr_disease_idx}_aux_cosine_epoch.csv", index=False)
             return self.multitask_test_step(data)
         
     def multitask_test_step(self, data):
-        loss, acc, x_pred = self.multitask_forward(data, mode="test")
-        return _
+        pr_loss, embeding = self.mt_gnn(data, mode="test")
+
+        print("Creating pr disease statisctic...")
+        
+        x_pred_masked = embeding[:, Config.pr_disease_idx]
+        y_masked = data.y[:, Config.pr_disease_idx]
+
+        x_pred_binary = torch.where(x_pred_masked > 0.5, torch.tensor(1, dtype=torch.int32), torch.tensor(0, dtype=torch.int32))
+        cm = confusion_matrix(y_masked, x_pred_binary)
+
+        auc = 0
+        if len(np.unique(y_masked)) > 1:
+            auc = roc_auc_score(y_masked, x_pred_binary)
+        
+        df = pd.DataFrame({"disease_idx": [Config.pr_disease_idx], 
+                           "acc": [accuracy_score(y_masked, x_pred_binary)], 
+                           "f1": [f1_score(y_masked, x_pred_binary)], 
+                           "recal": [recall_score(y_masked, x_pred_binary)], 
+                           "precision": [precision_score(y_masked, x_pred_binary)], 
+                           "auc":[auc],
+                           "auprc": [average_precision_score(y_masked, x_pred_binary)], 
+                           "cm": [" ".join(map(str, cm.flatten()))], 
+                           "x_sum": [ x_pred_binary.sum().item()], 
+                           "y_sum": [y_masked.sum().item()]})
+            
+        df.to_csv(f"results/multitask/{Config.pr_disease_idx}_classification.csv", index=False, sep=",")
+        print("Creating pr disease statisctic. DONE")
+
+        return pr_loss
 
     def cls_test_step(self, data):
         loss, acc, x_pred = self.basic_forward(data, mode="test")
@@ -311,7 +363,7 @@ y_sum: {y_masked.sum().item()}""")
         loss, _, x_pred = self.basic_forward(data, mode="test")
 
         df = pd.DataFrame({"disease_idx": [], "acc": [], "f1": [], "recal": [], "precision": [], "auc":[],"auprc": [], "cm": [], "x_sum": [], "y_sum": []})
-        print("Creating ped disease statisctic...")
+        print("Creating pred disease statisctic...")
         for idx in range(data.y.shape[1]):
             x_pred_masked = x_pred[:, idx]
             y_masked = data.y[:, idx]
@@ -335,7 +387,7 @@ y_sum: {y_masked.sum().item()}""")
                                "y_sum": y_masked.sum().item()}
             
         df.to_csv("results/disease_classifications.csv", index=False, sep=",")
-        print("Creating ped disease statisctic. DONE")
+        print("Creating pred disease statisctic. DONE")
         return loss
 
     def configure_optimizers(self):

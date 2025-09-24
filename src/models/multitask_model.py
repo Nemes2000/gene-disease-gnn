@@ -8,15 +8,15 @@ class MultiTaskGNNModel(nn.Module):
     def __init__(self, gnn: nn.Module, aux_tasks_num: int):
         super().__init__()
         self.gnn = gnn  # shared encoders
-        #TODO: i need an other one for ptetrain???
-        self.pr_classifier =  nn.BCEWithLogitsLoss()
-        self.aux_classifiers = nn.ModuleList(
-            [nn.BCEWithLogitsLoss() for _ in range(aux_tasks_num)]
-        )
+
+        #TODO: create complex layers for private layers
+        self.pr_layer = nn.Linear(Config.out_channels, Config.out_channels)
+        self.aux_layers = nn.ModuleList([nn.Linear(Config.out_channels, Config.out_channels) for _ in range(aux_tasks_num)])
+        self.classifier =  nn.BCEWithLogitsLoss()
         
     def forward(self, data, mode = "train", is_pretrain = False):
         x, edge_index, edge_weight = data.x, data.edge_index, data.edge_weight
-        x_pred = self.gnn.forward(x, edge_index, edge_weight)
+        embeding = self.gnn.forward(x, edge_index, edge_weight)
 
         # Only calculate the loss on the nodes corresponding to the mask
         if mode == "train":
@@ -29,22 +29,28 @@ class MultiTaskGNNModel(nn.Module):
             assert False, f"Unknown forward mode: {mode}"
 
         if is_pretrain:
-            return self.pr_classifier(x_pred[mask].unsqueeze(1), data.y[mask].unsqueeze(1))
+            return self.classifier(embeding[mask].unsqueeze(1), data.y[mask].unsqueeze(1))
         else:
             pr_mask = mask.clone()
             pr_mask.zero_()
-            pr_mask[:, data.pr_disease_idx] = mask[:, data.pr_disease_idx]
+            pr_mask[:, Config.pr_disease_idx] = mask[:, Config.pr_disease_idx]
 
-            pr_loss = self.pr_classifier(x_pred[mask].unsqueeze(1), data.y[mask].unsqueeze(1))
+            pr_embeding = self.pr_layer(embeding)
+
+            pr_loss = self.classifier(pr_embeding[pr_mask].unsqueeze(1), data.y[pr_mask].unsqueeze(1))
 
             aux_losses = []
-            for idx, disease_idx in enumerate(data.aux_disease_idxs):
-                #TODO: a mask készítés során csak az adott betegség kell vagy a pr betegségre kell osztályozni?
+            for idx, disease_idx in enumerate(Config.aux_disease_idxs):
                 aux_mask = mask.clone()
                 aux_mask.zero_()
                 aux_mask[:, disease_idx] = mask[:, disease_idx]
 
-                x_pred_aux = self.aux_classifiers[idx](x_pred[mask].unsqueeze(1), data.y[mask].unsqueeze(1))
+                aux_embeding = self.aux_layers[idx](embeding)
+
+                x_pred_aux = self.classifier(aux_embeding[aux_mask].unsqueeze(1), data.y[aux_mask].unsqueeze(1))
                 aux_losses.append(x_pred_aux)
+
+            if mode == "test":
+                return pr_loss, embeding
            
             return pr_loss, aux_losses

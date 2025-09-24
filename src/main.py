@@ -1,4 +1,4 @@
-from mappers.idmapper import IdMapper
+import pandas as pd
 import wandb
 import argparse
 
@@ -15,8 +15,10 @@ if __name__ == "__main__":
     pl.seed_everything(42)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-model', type=str, choices=[ModelTypes.BASIC, ModelTypes.CLS_WEIGHT], default=ModelTypes.CLS_WEIGHT)
+    parser.add_argument('-model', type=str, choices=[ModelTypes.BASIC.value, ModelTypes.CLS_WEIGHT.value, ModelTypes.MULTITASK.value], default=ModelTypes.MULTITASK.value)
     parser.add_argument('-disease', type=str)
+    parser.add_argument('-pr_disease', type=str)
+    parser.add_argument('-aux_diseases', nargs="+", type=str)
     parser.add_argument('-epoch', type=int)
     parser.add_argument('--opt', action='store_true', help="If given, then optimalization will run.")     
     parser.add_argument('-opt-step', type=int)
@@ -43,17 +45,26 @@ if __name__ == "__main__":
     else:
         dataset = get_gtex_disgenet_dataset()
 
+    if args.model == ModelTypes.MULTITASK and args.pr_disease and args.aux_diseases:
+        Config.pr_disease_idx = dataset.mapper.diseases_id_to_idx_map()[args.pr_disease]
+        Config.aux_disease_idxs =  [dataset.mapper.diseases_id_to_idx_map()[aux_disease] for aux_disease in args.aux_diseases]
+        Config.aux_task_num = len(args.aux_diseases)
+        Config.wandb_project_name += "_" + str(Config.pr_disease_idx)
+
     if args.disease:
-        disease_id = dataset.mapper.diseases_id_to_idx_map()[args.disease]
-        Config.disease_idx = disease_id
-        Config.pos_class_weight = dataset[0].train_mask[:,disease_id].sum() / dataset[0].y[:,disease_id].sum()
-        print(disease_id, Config.pos_class_weight)
-        print("sum pos: ",dataset[0].train_mask[:,disease_id].sum())
+        disease_idx = dataset.mapper.diseases_id_to_idx_map()[args.disease]
+        Config.disease_idx = disease_idx
+        Config.pos_class_weight = dataset[0].train_mask[:,disease_idx].sum() / dataset[0].y[:,disease_idx].sum()
+        print(disease_idx, Config.pos_class_weight)
+        print("sum pos: ",dataset[0].train_mask[:,disease_idx].sum())
         print("y shape: ",dataset[0].y.shape)
 
     Config.test_dataset = False
     Config.in_channels = dataset.num_node_features
     Config.out_channels = dataset[0].y.shape[1]
+
+    # df = pd.DataFrame(dataset[0].y.numpy())
+    # df.to_csv("results/y_matrix.csv", index=False)
     
     wandb.login(key=Config.wandb_api_key)
 
