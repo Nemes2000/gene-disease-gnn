@@ -1,6 +1,8 @@
 from torch import nn
 import torch.nn.functional as F
 
+from config import Config
+
 class Weight(nn.Module):
     def __init__(self, in_channel, hidden, out_channel, act_type='sigmoid'):
         super(Weight, self).__init__()
@@ -23,6 +25,7 @@ class Weight(nn.Module):
     def forward(self, x):
         x = self.linear1(x)
         x = F.relu(x)
+        x = F.dropout(x, p=Config.v_dropout_rate)
         x = self.linear2(x)
         x = self.act(x)
         return x

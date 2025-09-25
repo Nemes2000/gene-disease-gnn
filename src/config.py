@@ -59,6 +59,7 @@ class Config():
     v_act_type = "sigmoid"
     clip = 0.5
     v_emb_dim = 2
+    v_dropout_rate = 0.041454
     v_lr = 0.005
     v_wd = 0.004870443319486102
     mt_lr = 0.01859073883306547
