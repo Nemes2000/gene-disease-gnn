@@ -11,15 +11,13 @@ class MultiTaskGNNModel(nn.Module):
 
         #TODO: create complex layers for private layers
         private_layer = nn.Sequential(
-            nn.Linear(Config.out_channels, 2000),
+            nn.Linear(Config.out_channels, 1000),
             nn.ReLU(inplace=True), 
             nn.Dropout(Config.dropout_rate), 
-            nn.Linear(2000, 1500),
+            nn.Linear(1000, 500),
             nn.ReLU(inplace=True), 
             nn.Dropout(Config.dropout_rate),
-            nn.Linear(1500, Config.out_channels),
-            nn.ReLU(inplace=True), 
-            nn.Dropout(Config.dropout_rate),
+            nn.Linear(500, Config.out_channels),
             )
 
         self.pr_layer = private_layer

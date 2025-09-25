@@ -31,7 +31,7 @@ class LightningGNNModel(pl.LightningModule):
             self.cos_ = torch.nn.CosineSimilarity()
             
             # weigth model, optimizer_v is not saved in the checkpoint !!!
-            self.vnet = Weight(5, Config.weight_emb_dim, 1, Config.weigth_act_type)
+            self.vnet = Weight(4, Config.weight_emb_dim, 1, Config.weigth_act_type)
             self.optimizer_v = torch.optim.Adam(self.vnet.parameters(), lr=Config.weight_lr, weight_decay=1e-3)
 
             # optimizer and scheduler are passed back with configure_optimizers => will be saved with the modell
@@ -117,7 +117,6 @@ class LightningGNNModel(pl.LightningModule):
             _loss_pr,
             torch.ones_like(_loss_pr),
             torch.zeros_like(_loss_pr),
-            torch.zeros_like(_loss_pr),
             torch.full_like(_loss_pr, 1.0),
         )).transpose(1,0)
 
@@ -128,9 +127,8 @@ class LightningGNNModel(pl.LightningModule):
 
             emb = torch.stack([
                 loss_aux,
+                torch.zeros_like(loss_aux),
                 torch.ones_like(loss_aux),
-                torch.zeros_like(loss_aux),
-                torch.zeros_like(loss_aux),
                 torch.full_like(loss_aux, pr_aux_s_cos[idx].item())
             ], dim=0)  # shape: [5, N]
 
@@ -187,7 +185,6 @@ class LightningGNNModel(pl.LightningModule):
             _loss_pr,
             torch.ones_like(_loss_pr),
             torch.zeros_like(_loss_pr),
-            torch.zeros_like(_loss_pr),
             torch.full_like(_loss_pr, 1.0),
         ))
             
@@ -197,9 +194,8 @@ class LightningGNNModel(pl.LightningModule):
 
             emb = torch.stack([
                 loss_aux,
+                torch.zeros_like(loss_aux),
                 torch.ones_like(loss_aux),
-                torch.zeros_like(loss_aux),
-                torch.zeros_like(loss_aux),
                 torch.full_like(loss_aux, pr_aux_s_cos[idx].item())
             ], dim=0)  # shape: [5, N]
 

@@ -53,7 +53,7 @@ class Config():
     aux_disease_idxs = []
     aux_task_num = 0
     pretrain_epochs = 5
-    weight_emb_dim = 1000
+    weight_emb_dim = 10
     weigth_act_type = "sigmoid"
     weight_lr = 0.005
     max_lr = 1e-3
