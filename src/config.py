@@ -56,16 +56,16 @@ class Config():
     aux_pos_class_weights = []
     aux_task_num = 0
     pretrain_epochs = 5
-    v_emb_dim = 10
     v_act_type = "sigmoid"
-    v_lr = 0.005
-    v_wd = 1e-2
-    mt_lr = 1e-3
-    mt_wd = 1e-2
-    mt_eps = 1e-6
-    mt_hidden_1 = 100
-    mt_hidden_2 = 10
     clip = 0.5
+    v_emb_dim = 2
+    v_lr = 0.005
+    v_wd = 0.004870443319486102
+    mt_lr = 0.01859073883306547
+    mt_wd = 0.004309004534608284
+    mt_eps = 8.974635961426902e-05
+    mt_hidden_1 = 5
+    mt_hidden_2 = 33
 
     def set_train_val_test_dataset_size(self, test_size, val_size):
         self.train_test_split = val_size + test_size
