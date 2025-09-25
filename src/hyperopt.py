@@ -107,6 +107,8 @@ def wrapped_opt_train_function(dataset):
 
 def optimalization_train(config=None, dataset=None):
     with wandb.init(config=config):
+        config = wandb.config
+        
         if Config.pr_disease_idx:
             Config.v_emb_dim = config.v_emb_dim
             Config.mt_wd = config.mt_wd
@@ -115,8 +117,6 @@ def optimalization_train(config=None, dataset=None):
             Config.mt_hidden_1 = config.mt_hidden_1
             Config.mt_hidden_2 = config.mt_hidden_2
         else:
-            config = wandb.config
-
             Config.optimizer = Config.optimizer_map[config.optimizer]
             Config.num_layers = config.num_layers
             Config.hidden_channels = config.hidden_channels
@@ -124,5 +124,5 @@ def optimalization_train(config=None, dataset=None):
             Config.learning_rate = config.learning_rate
             Config.weight_decay = config.weight_decay
 
-            train_node_classifier(dataset=dataset)
+        train_node_classifier(dataset=dataset)
         
