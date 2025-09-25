@@ -43,6 +43,7 @@ class Config():
     raw_data_path = "../../data/raw/"
     processed_data_dir = "../../data/processed"
     model_name = "basic"
+    sweep_num = 0
 
     #wwandb params
     wandb_api_key = "e1f878235d3945d4141f9f8e5af41d712fca6eba"

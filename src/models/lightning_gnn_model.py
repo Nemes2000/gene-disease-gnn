@@ -6,6 +6,7 @@ import numpy as np
 from sklearn.metrics import confusion_matrix, f1_score, \
     accuracy_score, precision_score, recall_score, roc_auc_score, \
     average_precision_score, ConfusionMatrixDisplay, roc_curve
+import wandb
 
 from models.basic_model import BasicGNNModel
 from config import Config, ModelTypes
@@ -299,6 +300,9 @@ class LightningGNNModel(pl.LightningModule):
             return loss
          
     def test_step(self, data):
+        if wandb.run is not None:
+            Config.sweep_num = Config.sweep_num + 1
+
         if self.model_name == ModelTypes.BASIC:
             return self.basic_test_step(data)
         elif self.model_name == ModelTypes.CLS_WEIGHT:
@@ -340,7 +344,7 @@ class LightningGNNModel(pl.LightningModule):
             plt.legend(loc="lower right")
 
             # Mentés képként
-            plt.savefig(f"results/multitask/{Config.pr_disease_idx}_roc_curve.png", dpi=300)
+            plt.savefig(f"results/multitask/{Config.sweep_num}_{Config.pr_disease_idx}_roc_curve.png", dpi=300)
             plt.close()
         
         df = pd.DataFrame({"disease_idx": [Config.pr_disease_idx], 
@@ -354,7 +358,7 @@ class LightningGNNModel(pl.LightningModule):
                            "x_sum": [ y_pred.sum().item()], 
                            "y_sum": [y_masked.sum().item()]})
             
-        df.to_csv(f"results/multitask/{Config.pr_disease_idx}_classification.csv", index=False, sep=",")
+        df.to_csv(f"results/multitask/{Config.sweep_num}_{Config.pr_disease_idx}_classification.csv", index=False, sep=",")
         print("Creating pr disease statisctic. DONE")
 
         return pr_loss
