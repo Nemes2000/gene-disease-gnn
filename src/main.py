@@ -50,7 +50,7 @@ if __name__ == "__main__":
         Config.aux_disease_idxs =  [dataset.mapper.diseases_id_to_idx_map()[aux_disease] for aux_disease in args.aux_diseases]
         Config.aux_task_num = len(args.aux_diseases)
         Config.wandb_project_name += "_" + str(Config.pr_disease_idx)
-        all_d = dataset[0].y.shape(0)
+        all_d = dataset[0].y.shape[1]
         Config.pr_pos_class_weight =(all_d - dataset[0].y[:,Config.pr_disease_idx].sum())/dataset[0].y[:, Config.pr_disease_idx].sum()
         Config.aux_pos_class_weights = [(all_d - dataset[0].y[:,idx].sum())/dataset[0].y[:, idx].sum() for idx in Config.aux_disease_idxs]
         print(Config.pr_pos_class_weight, Config.aux_pos_class_weights)
@@ -58,7 +58,7 @@ if __name__ == "__main__":
     if args.disease:
         disease_idx = dataset.mapper.diseases_id_to_idx_map()[args.disease]
         Config.disease_idx = disease_idx
-        Config.pos_class_weight = (dataset[0].y.shape(0) - dataset[0].y[:,disease_idx].sum())/dataset[0].y[:, disease_idx].sum()
+        Config.pos_class_weight = (dataset[0].y.shape[1] - dataset[0].y[:,disease_idx].sum())/dataset[0].y[:, disease_idx].sum()
         print(disease_idx, Config.pos_class_weight)
         print("sum pos: ",dataset[0].train_mask[:,disease_idx].sum())
         print("y shape: ",dataset[0].y.shape)
