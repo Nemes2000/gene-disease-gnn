@@ -53,7 +53,6 @@ if __name__ == "__main__":
         all_d = dataset[0].y.shape[1]
         Config.pr_pos_class_weight =(all_d - dataset[0].y[:,Config.pr_disease_idx].sum())/dataset[0].y[:, Config.pr_disease_idx].sum()
         Config.aux_pos_class_weights = [(all_d - dataset[0].y[:,idx].sum())/dataset[0].y[:, idx].sum() for idx in Config.aux_disease_idxs]
-        print(Config.pr_pos_class_weight, Config.aux_pos_class_weights)
 
     if args.disease:
         disease_idx = dataset.mapper.diseases_id_to_idx_map()[args.disease]
@@ -66,16 +65,15 @@ if __name__ == "__main__":
     Config.test_dataset = False
     Config.in_channels = dataset.num_node_features
     Config.out_channels = dataset[0].y.shape[1]
-    print(Config.out_channels)
 
     # df = pd.DataFrame(dataset[0].y.numpy())
     # df.to_csv("results/y_matrix.csv", index=False)
     
-    # wandb.login(key=Config.wandb_api_key)
+    wandb.login(key=Config.wandb_api_key)
 
-    # if args.opt:
-    #     optimalization(dataset=dataset)
-    # else:
-    #     train_node_classifier(dataset=dataset)
+    if args.opt:
+        optimalization(dataset=dataset)
+    else:
+        train_node_classifier(dataset=dataset)
 
-    # wandb.finish()
+    wandb.finish()
