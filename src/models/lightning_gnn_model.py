@@ -32,18 +32,18 @@ class LightningGNNModel(pl.LightningModule):
             self.cos_ = torch.nn.CosineSimilarity()
             
             # weigth model, optimizer_v is not saved in the checkpoint !!!
-            self.vnet = Weight(4, Config.weight_emb_dim, 1, Config.weigth_act_type)
-            self.optimizer_v = torch.optim.Adam(self.vnet.parameters(), lr=Config.weight_lr, weight_decay=1e-3)
+            self.vnet = Weight(4, Config.v_emb_dim, 1, Config.v_act_type)
+            self.optimizer_v = torch.optim.Adam(self.vnet.parameters(), lr=Config.v_lr, weight_decay=Config.v_wd)
 
             # optimizer and scheduler are passed back with configure_optimizers => will be saved with the modell
             self.params = self.mt_gnn.parameters()
-            self.optimizer = torch.optim.AdamW(self.params, lr=Config.learning_rate, weight_decay=Config.weight_decay)
-            self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer, T_max= Config.epochs, eta_min=1e-6)
+            self.optimizer = torch.optim.AdamW(self.params, weight_decay = Config.mt_wd, eps=Config.mt_eps, lr = Config.mt_lr)
+            self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer, T_max= Config.epochs, eta_min=Config.mt_eps)
 
             # wont be saved in the checkpoint
             self.params_meta = self.mt_gnn_meta.parameters()
-            self.optimizer_meta = torch.optim.AdamW(self.params_meta, lr=Config.learning_rate, weight_decay=Config.weight_decay)
-            self.scheduler_meta = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer_meta, T_max=Config.epochs, eta_min=1e-6)
+            self.optimizer_meta = torch.optim.AdamW(self.params_meta, weight_decay = Config.mt_wd, eps=Config.mt_eps, lr = Config.mt_lr)
+            self.scheduler_meta = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer_meta, T_max=Config.epochs, eta_min=Config.mt_eps)
             
             self.unused_params_cleared = False
             self.clear_unused_meta_params = False

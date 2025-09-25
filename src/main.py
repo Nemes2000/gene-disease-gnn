@@ -45,14 +45,16 @@ if __name__ == "__main__":
     else:
         dataset = get_gtex_disgenet_dataset()
 
-    if args.model == ModelTypes.MULTITASK and args.pr_disease and args.aux_diseases:
+    if args.model == ModelTypes.MULTITASK and args.pr_disease:
         Config.pr_disease_idx = dataset.mapper.diseases_id_to_idx_map()[args.pr_disease]
-        Config.aux_disease_idxs =  [dataset.mapper.diseases_id_to_idx_map()[aux_disease] for aux_disease in args.aux_diseases]
-        Config.aux_task_num = len(args.aux_diseases)
         Config.wandb_project_name += "_" + str(Config.pr_disease_idx)
         all_d = dataset[0].y.shape[1]
         Config.pr_pos_class_weight =(all_d - dataset[0].y[:,Config.pr_disease_idx].sum())/dataset[0].y[:, Config.pr_disease_idx].sum()
-        Config.aux_pos_class_weights = [(all_d - dataset[0].y[:,idx].sum())/dataset[0].y[:, idx].sum() for idx in Config.aux_disease_idxs]
+        
+        if args.aux_diseases:
+            Config.aux_disease_idxs =  [dataset.mapper.diseases_id_to_idx_map()[aux_disease] for aux_disease in args.aux_diseases]
+            Config.aux_task_num = len(args.aux_diseases)
+            Config.aux_pos_class_weights = [(all_d - dataset[0].y[:,idx].sum())/dataset[0].y[:, idx].sum() for idx in Config.aux_disease_idxs]
 
     if args.disease:
         disease_idx = dataset.mapper.diseases_id_to_idx_map()[args.disease]

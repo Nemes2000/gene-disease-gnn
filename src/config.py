@@ -55,10 +55,14 @@ class Config():
     aux_pos_class_weights = []
     aux_task_num = 0
     pretrain_epochs = 5
-    weight_emb_dim = 10
-    weigth_act_type = "sigmoid"
-    weight_lr = 0.005
-    max_lr = 1e-3
+    v_emb_dim = 10
+    v_act_type = "sigmoid"
+    v_lr = 0.005
+    mt_lr = 1e-3
+    mt_wd = 1e-2
+    mt_eps = 1e-6
+    mt_hidden_1 = 100
+    mt_hidden_2 = 10
     clip = 0.5
 
     def set_train_val_test_dataset_size(self, test_size, val_size):

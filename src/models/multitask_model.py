@@ -11,19 +11,14 @@ class MultiTaskGNNModel(nn.Module):
         self.gnn = gnn  # shared encoders
 
         private_layer = nn.Sequential(
-            nn.Linear(Config.out_channels, 100),
+            nn.Linear(Config.out_channels, Config.mt_hidden_1),
             nn.ReLU(inplace=True), 
             nn.Dropout(Config.dropout_rate), 
-            nn.Linear(100, 50),
+            nn.Linear(Config.mt_hidden_1, Config.mt_hidden_2),
             nn.ReLU(inplace=True),
             nn.Dropout(Config.dropout_rate),
-            nn.Linear(50, Config.out_channels),
+            nn.Linear(Config.mt_hidden_2, Config.out_channels),
             )
-        
-        '''
-        TODO
-         - ha nincs segéd task milyen erredményt érek el
-        '''
 
         self.pr_layer = private_layer
         self.aux_layers = nn.ModuleList([copy.deepcopy(private_layer) for _ in range(aux_tasks_num)])
@@ -54,6 +49,9 @@ class MultiTaskGNNModel(nn.Module):
             pr_embeding = self.pr_layer(embeding)
 
             pr_loss = self.pr_classifier(pr_embeding[pr_mask].unsqueeze(1), data.y[pr_mask].unsqueeze(1))
+            
+            if mode == "test":
+                return pr_loss, embeding
 
             aux_losses = []
             for idx, (disease_idx, classifier) in enumerate(zip(Config.aux_disease_idxs, self.aux_classifiers)):
@@ -66,7 +64,5 @@ class MultiTaskGNNModel(nn.Module):
                 x_pred_aux = classifier(aux_embeding[aux_mask].unsqueeze(1), data.y[aux_mask].unsqueeze(1))
                 aux_losses.append(x_pred_aux)
 
-            if mode == "test":
-                return pr_loss, embeding
            
             return pr_loss, aux_losses
