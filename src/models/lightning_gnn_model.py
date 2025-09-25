@@ -232,7 +232,7 @@ class LightningGNNModel(pl.LightningModule):
                 ignore_index=True
             )
            
-        self.aux_cos_df.to_csv(f"results/multitask/{Config.pr_disease_idx}_aux_cosine_epoch.csv", index=False)
+        self.aux_cos_df.to_csv(f"results/multitask/{Config.sweep_num}_{Config.pr_disease_idx}_aux_cosine_epoch.csv", index=False)
 
         # compute loss
         loss_pr_avg = (loss_pr * v_pr).mean()
