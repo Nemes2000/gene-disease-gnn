@@ -51,6 +51,8 @@ class Config():
     #Multitask learning params
     pr_disease_idx = None
     aux_disease_idxs = []
+    pr_pos_class_weight = 1
+    aux_pos_class_weights = []
     aux_task_num = 0
     pretrain_epochs = 5
     weight_emb_dim = 10

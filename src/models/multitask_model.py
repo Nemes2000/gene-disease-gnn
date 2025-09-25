@@ -9,20 +9,26 @@ class MultiTaskGNNModel(nn.Module):
         super().__init__()
         self.gnn = gnn  # shared encoders
 
-        #TODO: create complex layers for private layers
         private_layer = nn.Sequential(
-            nn.Linear(Config.out_channels, 1000),
+            nn.Linear(Config.out_channels, 100),
             nn.ReLU(inplace=True), 
             nn.Dropout(Config.dropout_rate), 
-            nn.Linear(1000, 500),
-            nn.ReLU(inplace=True), 
+            nn.Linear(100, 50),
+            nn.ReLU(inplace=True),
             nn.Dropout(Config.dropout_rate),
-            nn.Linear(500, Config.out_channels),
+            nn.Linear(50, Config.out_channels),
             )
+        
+        '''
+        TODO
+         - súlyozás osztályozásnál
+         - ha nincs segéd task milyen erredményt érek el
+        '''
 
         self.pr_layer = private_layer
         self.aux_layers = nn.ModuleList([copy.deepcopy(private_layer) for _ in range(aux_tasks_num)])
-        self.classifier =  nn.BCEWithLogitsLoss()
+        self.pr_classifier =  nn.BCEWithLogitsLoss(pos_weight=Config.pr_pos_class_weight)
+        self.aux_classifiers =  [nn.BCEWithLogitsLoss(pos_weight=w) for w in Config.aux_pos_class_weights]
         
     def forward(self, data, mode = "train", is_pretrain = False):
         x, edge_index, edge_weight = data.x, data.edge_index, data.edge_weight
@@ -39,7 +45,7 @@ class MultiTaskGNNModel(nn.Module):
             assert False, f"Unknown forward mode: {mode}"
 
         if is_pretrain:
-            return self.classifier(embeding[mask].unsqueeze(1), data.y[mask].unsqueeze(1))
+            return self.pr_classifier(embeding[mask].unsqueeze(1), data.y[mask].unsqueeze(1))
         else:
             pr_mask = mask.clone()
             pr_mask.zero_()
@@ -47,17 +53,17 @@ class MultiTaskGNNModel(nn.Module):
 
             pr_embeding = self.pr_layer(embeding)
 
-            pr_loss = self.classifier(pr_embeding[pr_mask].unsqueeze(1), data.y[pr_mask].unsqueeze(1))
+            pr_loss = self.pr_classifier(pr_embeding[pr_mask].unsqueeze(1), data.y[pr_mask].unsqueeze(1))
 
             aux_losses = []
-            for idx, disease_idx in enumerate(Config.aux_disease_idxs):
+            for idx, (disease_idx, classifier) in enumerate(zip(Config.aux_disease_idxs, self.aux_classifiers)):
                 aux_mask = mask.clone()
                 aux_mask.zero_()
                 aux_mask[:, disease_idx] = mask[:, disease_idx]
 
                 aux_embeding = self.aux_layers[idx](embeding)
 
-                x_pred_aux = self.classifier(aux_embeding[aux_mask].unsqueeze(1), data.y[aux_mask].unsqueeze(1))
+                x_pred_aux = classifier(aux_embeding[aux_mask].unsqueeze(1), data.y[aux_mask].unsqueeze(1))
                 aux_losses.append(x_pred_aux)
 
             if mode == "test":
