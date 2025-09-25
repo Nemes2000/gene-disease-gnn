@@ -1,10 +1,11 @@
+from matplotlib import pyplot as plt
 import torch
 import pytorch_lightning as pl
 import pandas as pd
 import numpy as np
 from sklearn.metrics import confusion_matrix, f1_score, \
     accuracy_score, precision_score, recall_score, roc_auc_score, \
-    average_precision_score, ConfusionMatrixDisplay
+    average_precision_score, ConfusionMatrixDisplay, roc_curve
 
 from models.basic_model import BasicGNNModel
 from config import Config, ModelTypes
@@ -85,9 +86,6 @@ class LightningGNNModel(pl.LightningModule):
         return loss, acc
     
     def multitask_forward(self, data, mode = "train"):
-        #TODO: set all feature to a start one => i dont need that ?
-        #node_feature_au = init_emb
-        
         loss_pr_meta = 0 
         pr_aux_s_cos = 0
         # meta models are the copy of original ones
@@ -214,8 +212,18 @@ class LightningGNNModel(pl.LightningModule):
 
         for c, idx, w in zip(pr_aux_s_cos, Config.aux_disease_idxs, v_aux_s):
             print(f'{self.current_epoch} - aux cos {idx}: %f'%(c.item()), 'weight: %f'%(w.item()))
-            self.aux_cos_df.loc[len(self.aux_cos_df)] = {"epoch": self.current_epoch, "aux_idx": idx, "cos": c.item(), "weight": w.item()}
-
+            self.aux_cos_df = pd.concat(
+                [self.aux_cos_df, pd.DataFrame([{
+                    "epoch": self.current_epoch,
+                    "aux_idx": idx,
+                    "cos": c.item(),
+                    "weight": w.item()
+                }])],
+                ignore_index=True
+            )
+            print("DF shape:", self.aux_cos_df.shape)
+            print(self.aux_cos_df.tail())
+            
         # compute loss
         loss_pr_avg = (loss_pr * v_pr).mean()
         loss_aux_avg_s = [(loss_aux * v_aux).mean() for loss_aux, v_aux in zip(loss_aux_s, v_aux_s)]
@@ -296,21 +304,39 @@ class LightningGNNModel(pl.LightningModule):
         y_true = data.y[:, Config.pr_disease_idx].detach().cpu().numpy()
         y_pred = (embeding[:, Config.pr_disease_idx] > 0.5).int().detach().cpu().numpy()
 
+        #tn, fp, fn, tp
         cm = confusion_matrix(y_true, y_pred)
 
         # y_pred = torch.where(x_pred_masked > 0.5, torch.tensor(1, dtype=torch.int32), torch.tensor(0, dtype=torch.int32))
         # cm = confusion_matrix(y_masked, y_pred)
 
-        auc = 0
+        roc_auc = 0
         if len(np.unique(y_masked)) > 1:
-            auc = roc_auc_score(y_masked, y_pred)
+            roc_auc = roc_auc_score(y_masked, y_pred)
+
+            fpr, tpr, thresholds = roc_curve(y_masked, y_pred)
+
+            # Ábra készítés
+            plt.figure()
+            plt.plot(fpr, tpr, color="darkorange", lw=2, label=f"ROC curve (AUC = {roc_auc:.2f})")
+            plt.plot([0, 1], [0, 1], color="navy", lw=2, linestyle="--")
+            plt.xlim([0.0, 1.0])
+            plt.ylim([0.0, 1.05])
+            plt.xlabel("False Positive Rate")
+            plt.ylabel("True Positive Rate")
+            plt.title("ROC Curve")
+            plt.legend(loc="lower right")
+
+            # Mentés képként
+            plt.savefig(f"results/multitask/{Config.pr_disease_idx}_roc_curve.png", dpi=300)
+            plt.close()
         
         df = pd.DataFrame({"disease_idx": [Config.pr_disease_idx], 
                            "acc": [accuracy_score(y_masked, y_pred)], 
                            "f1": [f1_score(y_masked, y_pred)], 
                            "recal": [recall_score(y_masked, y_pred)], 
                            "precision": [precision_score(y_masked, y_pred)], 
-                           "auc":[auc],
+                           "roc-auc":[roc_auc],
                            "auprc": [average_precision_score(y_masked, y_pred)], 
                            "cm": [" ".join(map(str, cm.flatten()))], 
                            "x_sum": [ y_pred.sum().item()], 
@@ -362,28 +388,28 @@ y_sum: {y_masked.sum().item()}""")
     def basic_test_step(self,data):
         loss, _, x_pred = self.basic_forward(data, mode="test")
 
-        df = pd.DataFrame({"disease_idx": [], "acc": [], "f1": [], "recal": [], "precision": [], "auc":[],"auprc": [], "cm": [], "x_sum": [], "y_sum": []})
+        df = pd.DataFrame({"disease_idx": [], "acc": [], "f1": [], "recal": [], "precision": [], "roc-auc":[],"auprc": [], "cm": [], "x_sum": [], "y_sum": []})
         print("Creating pred disease statisctic...")
         for idx in range(data.y.shape[1]):
             x_pred_masked = x_pred[:, idx]
             y_masked = data.y[:, idx]
 
-            x_pred_binary = torch.where(x_pred_masked > 0.5, torch.tensor(1, dtype=torch.int32), torch.tensor(0, dtype=torch.int32))
-            cm = confusion_matrix(y_masked, x_pred_binary)
+            y_pred_binary = torch.where(x_pred_masked > 0.5, torch.tensor(1, dtype=torch.int32), torch.tensor(0, dtype=torch.int32))
+            cm = confusion_matrix(y_masked, y_pred_binary)
 
-            auc = 0
+            roc_auc = 0
             if len(np.unique(y_masked)) > 1:
-                auc = roc_auc_score(y_masked, x_pred_binary)
-            
+                roc_auc = roc_auc_score(y_masked, y_pred_binary)
+                        
             df.loc[len(df)] = {"disease_idx": idx, 
-                               "acc": accuracy_score(y_masked, x_pred_binary), 
-                               "f1": f1_score(y_masked, x_pred_binary), 
-                               "recal": recall_score(y_masked, x_pred_binary), 
-                               "precision": precision_score(y_masked, x_pred_binary),
-                               "auc": auc,
-                               "auprc": average_precision_score(y_masked, x_pred_binary),
+                               "acc": accuracy_score(y_masked, y_pred_binary), 
+                               "f1": f1_score(y_masked, y_pred_binary), 
+                               "recal": recall_score(y_masked, y_pred_binary), 
+                               "precision": precision_score(y_masked, y_pred_binary),
+                               "roc-auc": roc_auc,
+                               "auprc": average_precision_score(y_masked, y_pred_binary),
                                "cm": " ".join(map(str, cm.flatten())),
-                               "x_sum": x_pred_binary.sum().item(),
+                               "x_sum": y_pred_binary.sum().item(),
                                "y_sum": y_masked.sum().item()}
             
         df.to_csv("results/disease_classifications.csv", index=False, sep=",")
