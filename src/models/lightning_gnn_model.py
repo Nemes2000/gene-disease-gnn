@@ -211,7 +211,6 @@ class LightningGNNModel(pl.LightningModule):
             v_aux_s = [self.vnet(loss_aux_emb) for loss_aux_emb in loss_aux_s_emb]
 
         for c, idx, w in zip(pr_aux_s_cos, Config.aux_disease_idxs, v_aux_s):
-            print(f'{self.current_epoch} - aux cos {idx}: %f'%(c.item()), 'weight: %f'%(w.item()))
             self.aux_cos_df = pd.concat(
                 [self.aux_cos_df, pd.DataFrame([{
                     "epoch": self.current_epoch,
@@ -221,9 +220,9 @@ class LightningGNNModel(pl.LightningModule):
                 }])],
                 ignore_index=True
             )
-            print("DF shape:", self.aux_cos_df.shape)
-            print(self.aux_cos_df.tail())
-            
+           
+        self.aux_cos_df.to_csv(f"results/multitask/{Config.pr_disease_idx}_aux_cosine_epoch.csv", index=False)
+
         # compute loss
         loss_pr_avg = (loss_pr * v_pr).mean()
         loss_aux_avg_s = [(loss_aux * v_aux).mean() for loss_aux, v_aux in zip(loss_aux_s, v_aux_s)]
@@ -291,7 +290,6 @@ class LightningGNNModel(pl.LightningModule):
         elif self.model_name == ModelTypes.CLS_WEIGHT:
             return self.cls_test_step(data)
         elif self.model_name == ModelTypes.MULTITASK:
-            self.aux_cos_df.to_csv(f"results/multitask/{Config.pr_disease_idx}_aux_cosine_epoch.csv", index=False)
             return self.multitask_test_step(data)
         
     def multitask_test_step(self, data):
