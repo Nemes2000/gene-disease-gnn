@@ -37,12 +37,12 @@ class LightningGNNModel(pl.LightningModule):
 
             # optimizer and scheduler are passed back with configure_optimizers => will be saved with the modell
             self.params = self.mt_gnn.parameters()
-            self.optimizer = torch.optim.AdamW(self.params, weight_decay = 1e-2, eps=1e-06, lr = Config.max_lr)
+            self.optimizer = torch.optim.AdamW(self.params, lr=Config.learning_rate, weight_decay=Config.weight_decay)
             self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer, T_max= Config.epochs, eta_min=1e-6)
 
             # wont be saved in the checkpoint
             self.params_meta = self.mt_gnn_meta.parameters()
-            self.optimizer_meta = torch.optim.AdamW(self.params_meta, weight_decay = 1e-2, eps=1e-06, lr = Config.max_lr)
+            self.optimizer_meta = torch.optim.AdamW(self.params_meta, lr=Config.learning_rate, weight_decay=Config.weight_decay)
             self.scheduler_meta = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer_meta, T_max=Config.epochs, eta_min=1e-6)
             
             self.unused_params_cleared = False
@@ -145,7 +145,7 @@ class LightningGNNModel(pl.LightningModule):
 
         # one step update of model parameter (fake) (Eq.6)
         self.optimizer_meta.zero_grad()
-        loss_meta.backward(retain_graph=True)
+        loss_meta.backward()
         torch.nn.utils.clip_grad_norm_(self.params_meta, Config.clip)
         self.optimizer_meta.step()
         self.train_step_meta += 1
@@ -217,6 +217,16 @@ class LightningGNNModel(pl.LightningModule):
                     "aux_idx": idx,
                     "cos": c.item(),
                     "weight": w.item()
+                }])],
+                ignore_index=True
+            )
+
+        self.aux_cos_df = pd.concat(
+                [self.aux_cos_df, pd.DataFrame([{
+                    "epoch": self.current_epoch,
+                    "aux_idx": Config.pr_disease_idx,
+                    "cos": 1,
+                    "weight": v_pr.item()
                 }])],
                 ignore_index=True
             )
