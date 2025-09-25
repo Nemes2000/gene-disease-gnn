@@ -237,7 +237,11 @@ class LightningGNNModel(pl.LightningModule):
         loss_pr_avg = (loss_pr * v_pr).mean()
         loss_aux_avg_s = [(loss_aux * v_aux).mean() for loss_aux, v_aux in zip(loss_aux_s, v_aux_s)]
         loss_pr_avg_weighted = loss_pr.mean()
-        loss_aux_avg_weighted = torch.stack([l.mean() for l in loss_aux_s]).mean()
+        if len(loss_aux_s) >0:
+            loss_aux_avg_weighted = torch.stack([l.mean() for l in loss_aux_s]).mean()
+        else:
+            loss_aux_avg_weighted = 0
+    
 
         v_aux_s_tensor = torch.tensor(v_aux_s)
         v_aux_s_mean = v_aux_s_tensor.mean().item()
