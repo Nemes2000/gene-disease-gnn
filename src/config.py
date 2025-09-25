@@ -58,6 +58,7 @@ class Config():
     v_emb_dim = 10
     v_act_type = "sigmoid"
     v_lr = 0.005
+    v_wd = 1e-2
     mt_lr = 1e-3
     mt_wd = 1e-2
     mt_eps = 1e-6

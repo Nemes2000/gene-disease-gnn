@@ -48,7 +48,12 @@ def optimalization(dataset):
                 'distribution': 'uniform',
                 'min': 0.000001,
                 'max': 0.0001
-            }
+            },
+            'v_wd': {
+                'distribution': 'uniform',
+                'min': 0.0001,
+                'max': 0.01
+            },
         }
         )
     else:
@@ -116,6 +121,7 @@ def optimalization_train(config=None, dataset=None):
             Config.mt_lr = config.mt_lr
             Config.mt_hidden_1 = config.mt_hidden_1
             Config.mt_hidden_2 = config.mt_hidden_2
+            Config.v_wd = config.v_wd
         else:
             Config.optimizer = Config.optimizer_map[config.optimizer]
             Config.num_layers = config.num_layers
