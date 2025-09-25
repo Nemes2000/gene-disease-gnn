@@ -276,9 +276,6 @@ class LightningGNNModel(pl.LightningModule):
                 self.share_param_name.append(n)
 
     def training_step(self, data):
-        if wandb.run is not None:
-            Config.sweep_num = Config.sweep_num + 1
-
         if self.model_name == ModelTypes.MULTITASK:
             if self.current_epoch < Config.pretrain_epochs:
                 loss = self.mt_gnn.forward(data, mode="train", is_pretrain=True)
@@ -360,6 +357,9 @@ class LightningGNNModel(pl.LightningModule):
             
         df.to_csv(f"results/multitask/{Config.sweep_num}_{Config.pr_disease_idx}_classification.csv", index=False, sep=",")
         print("Creating pr disease statisctic. DONE")
+
+        if wandb.run is not None:
+            Config.sweep_num = Config.sweep_num + 1
 
         return pr_loss
 
