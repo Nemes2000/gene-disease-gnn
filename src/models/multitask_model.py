@@ -1,6 +1,7 @@
 from sklearn.metrics import accuracy_score
 from torch import nn
 import copy
+import torch
 
 from config import Config
 
@@ -21,14 +22,13 @@ class MultiTaskGNNModel(nn.Module):
         
         '''
         TODO
-         - súlyozás osztályozásnál
          - ha nincs segéd task milyen erredményt érek el
         '''
 
         self.pr_layer = private_layer
         self.aux_layers = nn.ModuleList([copy.deepcopy(private_layer) for _ in range(aux_tasks_num)])
-        self.pr_classifier =  nn.BCEWithLogitsLoss(pos_weight=Config.pr_pos_class_weight)
-        self.aux_classifiers =  [nn.BCEWithLogitsLoss(pos_weight=w) for w in Config.aux_pos_class_weights]
+        self.pr_classifier =  nn.BCEWithLogitsLoss(pos_weight=torch.tensor(Config.pr_pos_class_weight))
+        self.aux_classifiers =  [nn.BCEWithLogitsLoss(pos_weight=torch.tensor(w)) for w in Config.aux_pos_class_weights]
         
     def forward(self, data, mode = "train", is_pretrain = False):
         x, edge_index, edge_weight = data.x, data.edge_index, data.edge_weight

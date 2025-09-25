@@ -16,9 +16,9 @@ def callbacks():
         monitor='val_loss',
         mode='min',
         save_top_k=1,
-        save_last=True,
+        save_last=False,
         dirpath='../data/saved_models/wandb',
-        filename='best_model-{epoch}-{val_loss:.2f}')
+        filename='v{epoch}')
 
     early_stopping = EarlyStopping(
         monitor='val_loss',
