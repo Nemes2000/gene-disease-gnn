@@ -295,7 +295,7 @@ class LightningGNNModel(pl.LightningModule):
         if self.model_name == ModelTypes.MULTITASK:
             pr_loss, _, embeding = self.mt_gnn(data, mode="val")
             self.log("val_loss", pr_loss)
-            y_masked = data.y[:, Config.pr_disease_idx].cpu()
+            y_masked = data.train_mask[:, Config.pr_disease_idx].cpu()
             y_pred = (embeding[:, Config.pr_disease_idx] > 0.5).int().detach().cpu().numpy()
             f1 = f1_score(y_masked, y_pred)
             self.log("val_f1", f1)
