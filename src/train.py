@@ -13,8 +13,8 @@ def callbacks():
     """
 
     model_cpkt = ModelCheckpoint(
-        monitor='val_loss',
-        mode='min',
+        monitor='val_f1',
+        mode='max',
         save_top_k=1,
         save_last=False,
         dirpath='../data/saved_models/wandb',
