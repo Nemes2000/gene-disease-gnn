@@ -65,4 +65,4 @@ class MultiTaskGNNModel(nn.Module):
                 aux_losses.append(x_pred_aux)
 
            
-            return pr_loss, aux_losses, embeding
+            return pr_loss, aux_losses

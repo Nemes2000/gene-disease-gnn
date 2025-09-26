@@ -93,7 +93,7 @@ class LightningGNNModel(pl.LightningModule):
         self.mt_gnn_meta.load_state_dict(self.mt_gnn.state_dict())
 
         # loss per example => reduce = false
-        loss_pr, loss_aux_s, _ = self.mt_gnn_meta.forward(data, mode)
+        loss_pr, loss_aux_s = self.mt_gnn_meta.forward(data, mode)
 
         # for log
         loss_pr_mean = loss_pr.mean()
@@ -153,7 +153,7 @@ class LightningGNNModel(pl.LightningModule):
         self.scheduler_meta.step(self.train_step_meta)
 
         # primary loss with updated parameter (Eq.7)
-        _loss_pr_meta, _ , _= self.mt_gnn_meta.forward(data, mode)
+        _loss_pr_meta, _ = self.mt_gnn_meta.forward(data, mode)
         loss_pr_meta += _loss_pr_meta
 
         # backward and update v-net params (Eq.9)
@@ -162,7 +162,7 @@ class LightningGNNModel(pl.LightningModule):
         self.optimizer_v.step()
 
         # with the updated weight, update model parameters (true) (Eq.8)
-        loss_pr, loss_aux_s, embeding = self.mt_gnn.forward(data, mode)
+        loss_pr, loss_aux_s = self.mt_gnn.forward(data, mode)
 
         # for log
         loss_pr_mean = loss_pr.mean()
@@ -231,11 +231,6 @@ class LightningGNNModel(pl.LightningModule):
                 }])],
                 ignore_index=True
             )
-        
-        y_masked = data.y[:, Config.pr_disease_idx].cpu()
-        y_pred = (embeding[:, Config.pr_disease_idx] > 0.5).int().detach().cpu().numpy()
-        f1 = f1_score(y_masked, y_pred)
-        self.log("train_f1", f1)
            
         self.aux_cos_df.to_csv(f"results/multitask/{Config.sweep_num}_{Config.pr_disease_idx}_aux_cosine_epoch.csv", index=False)
 
@@ -293,12 +288,8 @@ class LightningGNNModel(pl.LightningModule):
 
     def validation_step(self, data):
         if self.model_name == ModelTypes.MULTITASK:
-            pr_loss, _, embeding = self.mt_gnn(data, mode="val")
+            pr_loss, _ = self.mt_gnn(data, mode="val")
             self.log("val_loss", pr_loss)
-            y_masked = data.train_mask[:, Config.pr_disease_idx].cpu()
-            y_pred = (embeding[:, Config.pr_disease_idx] > 0.5).int().detach().cpu().numpy()
-            f1 = f1_score(y_masked, y_pred)
-            self.log("val_f1", f1)
             return pr_loss
         else:
             loss, acc = self.basic_forward(data, mode="val")
