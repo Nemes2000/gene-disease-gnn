@@ -10,6 +10,10 @@ class MultiTaskGNNModel(nn.Module):
         super().__init__()
         self.gnn = gnn  # shared encoders
 
+        #TODO: one layer
+        #TODO: kiiratni a cosinus távolsághoz használt vektorokat
+        #TODO: feature importance score a sulyozó modellre
+        
         private_layer = nn.Sequential(
             nn.Linear(Config.out_channels, Config.mt_hidden_1),
             nn.ReLU(inplace=True), 
@@ -17,7 +21,7 @@ class MultiTaskGNNModel(nn.Module):
             nn.Linear(Config.mt_hidden_1, Config.mt_hidden_2),
             nn.ReLU(inplace=True),
             nn.Dropout(Config.dropout_rate),
-            nn.Linear(Config.mt_hidden_2, Config.out_channels),
+            nn.Linear(Config.mt_hidden_2, 1),
             )
 
         self.pr_layer = private_layer
@@ -46,22 +50,27 @@ class MultiTaskGNNModel(nn.Module):
             pr_mask.zero_()
             pr_mask[:, Config.pr_disease_idx] = mask[:, Config.pr_disease_idx]
 
+            #(gene num, 1)
             pr_embeding = self.pr_layer(embeding)
 
-            pr_loss = self.pr_classifier(pr_embeding[pr_mask].unsqueeze(1), data.y[pr_mask].unsqueeze(1))
+            print(pr_embeding.shape, pr_embeding.unsqueeze(1).shape)
+
+            pr_loss = self.pr_classifier(pr_embeding.unsqueeze(1), data.y[pr_mask].unsqueeze(1))
             
             if mode == "test":
                 return pr_loss, embeding
 
             aux_losses = []
-            for idx, (disease_idx, classifier) in enumerate(zip(Config.aux_disease_idxs, self.aux_classifiers)):
+            for disease_idx, classifier, pr_layer in zip(Config.aux_disease_idxs, self.aux_classifiers, self.aux_layers):
                 aux_mask = mask.clone()
                 aux_mask.zero_()
                 aux_mask[:, disease_idx] = mask[:, disease_idx]
 
-                aux_embeding = self.aux_layers[idx](embeding)
+                aux_embeding = pr_layer(embeding)
 
-                x_pred_aux = classifier(aux_embeding[aux_mask].unsqueeze(1), data.y[aux_mask].unsqueeze(1))
+                
+
+                x_pred_aux = classifier(aux_embeding.unsqueeze(1), data.y[aux_mask].unsqueeze(1))
                 aux_losses.append(x_pred_aux)
 
            

@@ -92,17 +92,17 @@ init_emb = node_features.mean(dim=0).detach()
 '''
 Initialize weight model for multi-tasks
 '''
-vnet = Weight(5, Config.weight_emb_dim, 1, Config.weigth_act_type)
-optimizer_v = torch.optim.Adam(vnet.parameters(), lr=Config.weight_lr, weight_decay=1e-3)
+vnet = Weight(5, Config.v_emb_dim, 1, Config.v_act_type)
+optimizer_v = torch.optim.Adam(vnet.parameters(), lr=Config.v_lr, weight_decay=1e-3)
 
 '''
 Optimizer
 ''' 
 params = mt_gnn.parameters()
-optimizer = torch.optim.AdamW(params, weight_decay = 1e-2, eps=1e-06, lr = Config.max_lr)
+optimizer = torch.optim.AdamW(params, weight_decay = 1e-2, eps=1e-06, lr = Config.mt_lr)
 
 params_meta = mt_gnn_meta.parameters()
-optimizer_meta = torch.optim.AdamW(params_meta, weight_decay = 1e-2, eps=1e-06, lr = Config.max_lr)
+optimizer_meta = torch.optim.AdamW(params_meta, weight_decay = 1e-2, eps=1e-06, lr = Config.mt_lr)
 
 # Az optimizer tanulási rátájánnak csökkentéséhez
 scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max= Config.epochs, eta_min=1e-6)
