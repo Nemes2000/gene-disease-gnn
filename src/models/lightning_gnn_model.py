@@ -95,20 +95,16 @@ class LightningGNNModel(pl.LightningModule):
         # loss per example => reduce = false
         loss_pr, loss_aux_s = self.mt_gnn_meta.forward(data, mode)
 
-        # for log
-        loss_pr_mean = loss_pr.mean()
-        loss_aux_s_mean = [loss_aux.mean() for loss_aux in loss_aux_s]
-
         # clears the unused meta params
         if not self.clear_unused_meta_params:
             self.optimizer_meta.zero_grad()
-            loss_meta = loss_pr_mean + sum(loss_aux_s_mean)
+            loss_meta = loss_pr + sum(loss_aux_s)
             loss_meta.backward(retain_graph=True)
             clean_param_name([self.mt_gnn_meta], self.share_param_name)
             clean_param_name([self.mt_gnn_meta] , self.private_param_name)
             self.clear_unused_meta_params = True
 
-        pr_aux_s_cos = get_cos(self.params_meta, self.mt_gnn_meta, self.optimizer_meta, self.share_param_name, self.cos_, loss_pr_mean, loss_aux_s_mean)
+        pr_aux_s_cos = get_cos(self.params_meta, self.mt_gnn_meta, self.optimizer_meta, self.share_param_name, self.cos_, loss_pr, loss_aux_s)
 
         # embeddings for v-net
         _loss_pr = loss_pr.unsqueeze(0)
@@ -165,17 +161,15 @@ class LightningGNNModel(pl.LightningModule):
         loss_pr, loss_aux_s = self.mt_gnn.forward(data, mode)
 
         # for log
-        loss_pr_mean = loss_pr.mean()
-        loss_aux_s_mean = [loss_aux.mean() for loss_aux in loss_aux_s]
         if not self.unused_params_cleared:
             self.optimizer.zero_grad()
-            loss = loss_pr_mean + sum(loss_aux_s_mean)
+            loss = loss_pr + sum(loss_aux_s)
             loss.backward(retain_graph=True)
             clean_param_name([self.mt_gnn], self.share_param_name)
             clean_param_name([self.mt_gnn], self.private_param_name)
             self.unused_params_cleared = True
 
-        pr_aux_s_cos = get_cos(self.params, self.mt_gnn, self.optimizer, self.share_param_name, self.cos_, loss_pr_mean, loss_aux_s_mean)
+        pr_aux_s_cos = get_cos(self.params, self.mt_gnn, self.optimizer, self.share_param_name, self.cos_, loss_pr, loss_aux_s)
 
         # embeddings for v-net
         # shape = (5, batch size)   
@@ -211,11 +205,12 @@ class LightningGNNModel(pl.LightningModule):
             v_pr = self.vnet(loss_pr_emb)
             v_aux_s = [self.vnet(loss_aux_emb) for loss_aux_emb in loss_aux_s_emb]
 
-        for c, idx, w in zip(pr_aux_s_cos, Config.aux_disease_idxs, v_aux_s):
+        for c, idx, w, loss_a in zip(pr_aux_s_cos, Config.aux_disease_idxs, v_aux_s, loss_aux_s):
             self.aux_cos_df = pd.concat(
                 [self.aux_cos_df, pd.DataFrame([{
                     "epoch": self.current_epoch,
                     "aux_idx": idx,
+                    "vec": loss_a,
                     "cos": c.item(),
                     "weight": w.item()
                 }])],
@@ -226,6 +221,7 @@ class LightningGNNModel(pl.LightningModule):
                 [self.aux_cos_df, pd.DataFrame([{
                     "epoch": self.current_epoch,
                     "aux_idx": Config.pr_disease_idx,
+                    "vec": loss_pr,
                     "cos": 1,
                     "weight": v_pr.item()
                 }])],
@@ -251,17 +247,6 @@ class LightningGNNModel(pl.LightningModule):
                 (loss_pr_avg_weighted, loss_aux_avg_weighted, v_pr.mean().item(), v_aux_s_mean, v_aux_s_std))
 
         loss = loss_pr_avg + sum(loss_aux_avg_s)
-        # train_pr_losses += [loss_pr_avg_weighted.cpu().detach().tolist()]
-        # train_aux_losses += [loss_aux_avg_weighted.cpu().detach().tolist()]
-
-        # optimize model parameters => lightning does it automaticly
-        # self.optimizer.zero_grad()
-        # loss.backward()
-        # torch.nn.utils.clip_grad_norm_(self.params, Config.clip)
-        # self.optimizer.step()
-        # self.train_step += 1
-        # self.scheduler.step(self.train_step)
-
         return loss
     
     def get_model_params(self):
@@ -320,14 +305,11 @@ class LightningGNNModel(pl.LightningModule):
         #tn, fp, fn, tp
         cm = confusion_matrix(y_true, y_pred)
 
-        # y_pred = torch.where(x_pred_masked > 0.5, torch.tensor(1, dtype=torch.int32), torch.tensor(0, dtype=torch.int32))
-        # cm = confusion_matrix(y_masked, y_pred)
-
         roc_auc = 0
         if len(np.unique(y_masked)) > 1:
             roc_auc = roc_auc_score(y_masked, y_pred)
 
-            fpr, tpr, thresholds = roc_curve(y_masked, y_pred)
+            fpr, tpr, _ = roc_curve(y_masked, y_pred)
 
             # Ábra készítés
             plt.figure()
