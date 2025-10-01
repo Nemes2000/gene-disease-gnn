@@ -5,10 +5,10 @@ class Config():
     # If you use the test dataset set min_disease_s_gene_number to 0, and train test_split to 0.5 
     min_disease_s_gene_number = 10
     min_gene_s_disease_number = 3
-    test_size = 0.2
-    val_size = 0.0
+    test_size = 0.1
+    val_size = 0.1
     train_test_split = 0.2
-    test_val_split = 1
+    test_val_split = 0.5
     process_files = False
     pos_class_weight = 1
     disease_idx = None
@@ -64,7 +64,7 @@ class Config():
     v_wd = 0.004870443319486102
     mt_lr = 0.01859073883306547
     mt_wd = 0.004309004534608284
-    mt_eps = 8.974635961426902e-05
+    mt_eps = 8.974635961426902e-03
     mt_hidden_1 = 5
     mt_hidden_2 = 33
 

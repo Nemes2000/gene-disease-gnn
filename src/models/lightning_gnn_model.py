@@ -53,7 +53,7 @@ class LightningGNNModel(pl.LightningModule):
 
     def basic_forward(self, data, mode="train"):
         x, edge_index, edge_weight = data.x, data.edge_index, data.edge_weight
-        x_pred = self.model.forward(x, edge_index, edge_weight)
+        embeding = self.model.forward(x, edge_index, edge_weight)
 
         # Only calculate the loss on the nodes corresponding to the mask
         if mode == "train":
@@ -75,14 +75,14 @@ class LightningGNNModel(pl.LightningModule):
         # disease_num = data.y.shape[1]
         # x_pred[mask].reshape(-1, disease_num)
 
-        loss = self.loss_function(x_pred[mask].unsqueeze(1), data.y[mask].unsqueeze(1))
+        loss = self.loss_function(embeding[mask].unsqueeze(1), data.y[mask].unsqueeze(1))
 
-        x_pred_binary = torch.where(x_pred[mask] > 0.5, torch.tensor(1, dtype=torch.int32), torch.tensor(0, dtype=torch.int32))
-        y_masked = data.y[mask]
-        acc = accuracy_score(y_masked, x_pred_binary)
+        y_true = data.y[mask].detach().cpu().numpy()
+        y_pred = (embeding[mask] > 0.5).int().detach().cpu().numpy()
+        acc = accuracy_score(y_true, y_pred)
 
         if mode == "test":
-            return loss, acc, x_pred
+            return loss, acc, embeding
         return loss, acc
     
     def multitask_forward(self, data, mode = "train"):
@@ -256,14 +256,15 @@ class LightningGNNModel(pl.LightningModule):
                 self.share_param_name.append(n)
 
     def training_step(self, data):
+        loss = None
         if self.model_name == ModelTypes.MULTITASK:
             if self.current_epoch < Config.pretrain_epochs:
                 loss = self.mt_gnn.forward(data, mode="train", is_pretrain=True).mean()
             else: 
                 loss = self.multitask_forward(data)
         else:
-            loss = self.basic_forward(data, mode="train")
-
+            loss, _ = self.basic_forward(data, mode="train")
+        
         return loss
 
     def validation_step(self, data):
@@ -273,7 +274,6 @@ class LightningGNNModel(pl.LightningModule):
             return pr_loss
         else:
             loss, acc = self.basic_forward(data, mode="val")
-
             self.log("val_acc", acc)
             self.log("val_loss", loss)
 
@@ -380,33 +380,33 @@ y_sum: {y_masked.sum().item()}""")
         return loss
 
     def basic_test_step(self,data):
-        loss, _, x_pred = self.basic_forward(data, mode="test")
+        loss, _, embeding = self.basic_forward(data, mode="test")
 
         df = pd.DataFrame({"disease_idx": [], "acc": [], "f1": [], "recal": [], "precision": [], "roc-auc":[],"auprc": [], "cm": [], "x_sum": [], "y_sum": []})
         print("Creating pred disease statisctic...")
         for idx in range(data.y.shape[1]):
-            x_pred_masked = x_pred[:, idx]
-            y_masked = data.y[:, idx]
+            embeding_masked = embeding[:, idx]
+            y_true = data.y[:, idx].detach().cpu().numpy()
+            y_pred = (embeding_masked > 0.5).int().detach().cpu().numpy()
 
-            y_pred_binary = torch.where(x_pred_masked > 0.5, torch.tensor(1, dtype=torch.int32), torch.tensor(0, dtype=torch.int32))
-            cm = confusion_matrix(y_masked, y_pred_binary)
+            cm = confusion_matrix(y_true, y_pred)
 
             roc_auc = 0
-            if len(np.unique(y_masked)) > 1:
-                roc_auc = roc_auc_score(y_masked, y_pred_binary)
+            if len(np.unique(y_true)) > 1:
+                roc_auc = roc_auc_score(y_true, y_pred)
                         
             df.loc[len(df)] = {"disease_idx": idx, 
-                               "acc": accuracy_score(y_masked, y_pred_binary), 
-                               "f1": f1_score(y_masked, y_pred_binary), 
-                               "recal": recall_score(y_masked, y_pred_binary), 
-                               "precision": precision_score(y_masked, y_pred_binary),
+                               "acc": accuracy_score(y_true, y_pred), 
+                               "f1": f1_score(y_true, y_pred), 
+                               "recal": recall_score(y_true, y_pred), 
+                               "precision": precision_score(y_true, y_pred),
                                "roc-auc": roc_auc,
-                               "auprc": average_precision_score(y_masked, y_pred_binary),
+                               "auprc": average_precision_score(y_true, y_pred),
                                "cm": " ".join(map(str, cm.flatten())),
-                               "x_sum": y_pred_binary.sum().item(),
-                               "y_sum": y_masked.sum().item()}
+                               "x_sum": y_pred.sum().item(),
+                               "y_sum": y_true.sum().item()}
             
-        df.to_csv("results/disease_classifications.csv", index=False, sep=",")
+        df.to_csv("results/new_disease_classifications.csv", index=False, sep=",")
         print("Creating pred disease statisctic. DONE")
         return loss
 

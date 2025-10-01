@@ -35,7 +35,7 @@ class MultiTaskGNNModel(nn.Module):
         if mode == "train":
             mask = data.train_mask
         elif mode == "val":
-            mask = data.test_mask
+            mask = data.val_mask
         elif mode == "test":
             mask = data.test_mask
         else:

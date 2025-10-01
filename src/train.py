@@ -68,7 +68,7 @@ def test_node_classifier(dataset, model_ckpt_name):
         gradient_clip_algorithm='norm', # calc L2 norm
         logger=pl.loggers.WandbLogger(project=Config.wandb_project_name, log_model="all")
     )
-    model = LightningGNNModel.load_from_checkpoint(model_ckpt_name)
+    model = LightningGNNModel.load_from_checkpoint("data/saved_models/multitask/" +model_ckpt_name)
 
     trainer.test(model, dataloaders=node_data_loader)
 
