@@ -95,37 +95,38 @@ class LightningGNNModel(pl.LightningModule):
         # loss per example => reduce = false
         loss_pr, loss_aux_s = self.mt_gnn_meta.forward(data, mode)
 
+        #TODO: mean or sum?
+        loss_pr_mean = loss_pr.mean()
+        loss_aux_s_mean = [loss_aux.mean() for loss_aux in loss_aux_s]
+
         # clears the unused meta params
         if not self.clear_unused_meta_params:
             self.optimizer_meta.zero_grad()
-            loss_meta = loss_pr + sum(loss_aux_s)
+            loss_meta = loss_pr_mean + sum(loss_aux_s_mean)
             loss_meta.backward(retain_graph=True)
             clean_param_name([self.mt_gnn_meta], self.share_param_name)
             clean_param_name([self.mt_gnn_meta] , self.private_param_name)
             self.clear_unused_meta_params = True
 
-        pr_aux_s_cos = get_cos(self.params_meta, self.mt_gnn_meta, self.optimizer_meta, self.share_param_name, self.cos_, loss_pr, loss_aux_s)
+        pr_aux_s_cos = get_cos(self.params_meta, self.mt_gnn_meta, self.optimizer_meta, self.share_param_name, self.cos_, loss_pr_mean, loss_aux_s_mean)
 
         # embeddings for v-net
-        _loss_pr = loss_pr.unsqueeze(0)
         loss_pr_emb = torch.stack((
-            _loss_pr,
-            torch.ones_like(_loss_pr),
-            torch.zeros_like(_loss_pr),
-            torch.full_like(_loss_pr, 1.0),
+            loss_pr,
+            torch.ones([len(loss_pr)], device=loss_pr.device),
+            torch.zeros([len(loss_pr)], device=loss_pr.device),
+            torch.full([len(loss_pr)], 1.0, device=loss_pr.device),
         )).transpose(1,0)
 
         
         loss_aux_s_emb = []
-        for idx, loss_aux in enumerate(loss_aux_s):
-            loss_aux = loss_aux.unsqueeze(0)  # shape: [1]
-
-            emb = torch.stack([
+        for cos_aux, loss_aux in zip(pr_aux_s_cos, loss_aux_s):
+            emb = torch.stack((
                 loss_aux,
-                torch.zeros_like(loss_aux),
-                torch.ones_like(loss_aux),
-                torch.full_like(loss_aux, pr_aux_s_cos[idx].item())
-            ], dim=0)  # shape: [5, N]
+                torch.zeros([len(loss_aux)], device=loss_pr.device), \
+                torch.ones([len(loss_aux)], device=loss_pr.device), \
+                torch.full([len(loss_aux)], cos_aux.item(), device=loss_pr.device)
+            ))  # shape: [5, N]
 
             # shape: [N, 5]
             emb = emb.transpose(1, 0)
@@ -161,44 +162,40 @@ class LightningGNNModel(pl.LightningModule):
         loss_pr, loss_aux_s = self.mt_gnn.forward(data, mode)
 
         # for log
+        loss_pr_mean = loss_pr.mean()
+        loss_aux_s_mean = [loss_aux.mean() for loss_aux in loss_aux_s]
         if not self.unused_params_cleared:
             self.optimizer.zero_grad()
-            loss = loss_pr + sum(loss_aux_s)
+            loss = loss_pr_mean + sum(loss_aux_s_mean)
             loss.backward(retain_graph=True)
             clean_param_name([self.mt_gnn], self.share_param_name)
             clean_param_name([self.mt_gnn], self.private_param_name)
             self.unused_params_cleared = True
 
-        pr_aux_s_cos = get_cos(self.params, self.mt_gnn, self.optimizer, self.share_param_name, self.cos_, loss_pr, loss_aux_s)
+        pr_aux_s_cos = get_cos(self.params, self.mt_gnn, self.optimizer, self.share_param_name, self.cos_, loss_pr_mean, loss_aux_s_mean)
 
         # embeddings for v-net
         # shape = (5, batch size)   
-        _loss_pr = loss_pr.unsqueeze(0)
         loss_pr_emb = torch.stack((
-            _loss_pr,
-            torch.ones_like(_loss_pr),
-            torch.zeros_like(_loss_pr),
-            torch.full_like(_loss_pr, 1.0),
-        ))
-            
+            loss_pr,
+            torch.ones([len(loss_pr)], device=loss_pr.device),
+            torch.zeros([len(loss_pr)], device=loss_pr.device),
+            torch.full([len(loss_pr)], 1.0, device=loss_pr.device),
+        )).transpose(1,0)
+
+        
         loss_aux_s_emb = []
-        for idx, loss_aux in enumerate(loss_aux_s):
-            loss_aux = loss_aux.unsqueeze(0)  # shape: [1]
-
-            emb = torch.stack([
+        for cos_aux, loss_aux in zip(pr_aux_s_cos, loss_aux_s):
+            emb = torch.stack((
                 loss_aux,
-                torch.zeros_like(loss_aux),
-                torch.ones_like(loss_aux),
-                torch.full_like(loss_aux, pr_aux_s_cos[idx].item())
-            ], dim=0)  # shape: [5, N]
-
+                torch.zeros([len(loss_aux)], device=loss_pr.device), \
+                torch.ones([len(loss_aux)], device=loss_pr.device), \
+                torch.full([len(loss_aux)], cos_aux.item(), device=loss_pr.device)
+            )) 
+            
             # shape: [N, 5]
             emb = emb.transpose(1, 0)
             loss_aux_s_emb.append(emb)
-        
-        # embeddings for v-net
-        #shape = (batch size, 5)
-        loss_pr_emb = loss_pr_emb.transpose(1, 0)
 
         # compute weight
         with torch.no_grad():
@@ -210,7 +207,7 @@ class LightningGNNModel(pl.LightningModule):
                 [self.aux_cos_df, pd.DataFrame([{
                     "epoch": self.current_epoch,
                     "aux_idx": idx,
-                    "vec": loss_a,
+                    "vec": loss_a.detach().cpu(),
                     "cos": c.item(),
                     "weight": w.item()
                 }])],
@@ -221,7 +218,7 @@ class LightningGNNModel(pl.LightningModule):
                 [self.aux_cos_df, pd.DataFrame([{
                     "epoch": self.current_epoch,
                     "aux_idx": Config.pr_disease_idx,
-                    "vec": loss_pr,
+                    "vec": loss_pr.detach().cpu(),
                     "cos": 1,
                     "weight": v_pr.item()
                 }])],
@@ -263,7 +260,7 @@ class LightningGNNModel(pl.LightningModule):
     def training_step(self, data):
         if self.model_name == ModelTypes.MULTITASK:
             if self.current_epoch < Config.pretrain_epochs:
-                loss = self.mt_gnn.forward(data, mode="train", is_pretrain=True)
+                loss = self.mt_gnn.forward(data, mode="train", is_pretrain=True).mean()
             else: 
                 loss = self.multitask_forward(data)
         else:
@@ -274,7 +271,7 @@ class LightningGNNModel(pl.LightningModule):
     def validation_step(self, data):
         if self.model_name == ModelTypes.MULTITASK:
             pr_loss, _ = self.mt_gnn(data, mode="val")
-            self.log("val_loss", pr_loss)
+            self.log("val_loss", pr_loss.mean())
             return pr_loss
         else:
             loss, acc = self.basic_forward(data, mode="val")
@@ -300,7 +297,7 @@ class LightningGNNModel(pl.LightningModule):
         y_masked = data.y[:, Config.pr_disease_idx].cpu()
 
         y_true = data.y[:, Config.pr_disease_idx].detach().cpu().numpy()
-        y_pred = (embeding[:, Config.pr_disease_idx] > 0.5).int().detach().cpu().numpy()
+        y_pred = (embeding > 0.5).int().detach().cpu().numpy()
 
         #tn, fp, fn, tp
         cm = confusion_matrix(y_true, y_pred)
@@ -343,7 +340,7 @@ class LightningGNNModel(pl.LightningModule):
         if wandb.run is not None:
             Config.sweep_num = Config.sweep_num + 1
 
-        return pr_loss
+        return pr_loss.mean()
 
     def cls_test_step(self, data):
         loss, acc, x_pred = self.basic_forward(data, mode="test")
