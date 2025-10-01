@@ -52,5 +52,25 @@ def train_node_classifier(dataset):
 
     # Test best model on the test set
     trainer.test(model, dataloaders=node_data_loader)
+
+def test_node_classifier(dataset, model_ckpt_name):
+    node_data_loader = geom_data.DataLoader(dataset, batch_size=1, num_workers=11, persistent_workers=True)
+
+    root_dir = os.path.join(Config.checkpoint_path, Config.model_name)
+    os.makedirs(root_dir, exist_ok=True)
+
+    trainer = pl.Trainer(
+        default_root_dir=root_dir,
+        callbacks=callbacks(),
+        devices=1,
+        max_epochs=Config.epochs,
+        gradient_clip_val=Config.clip,
+        gradient_clip_algorithm='norm', # calc L2 norm
+        logger=pl.loggers.WandbLogger(project=Config.wandb_project_name, log_model="all")
+    )
+    model = LightningGNNModel.load_from_checkpoint(model_ckpt_name)
+
+    trainer.test(model, dataloaders=node_data_loader)
+
       
       

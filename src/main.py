@@ -2,7 +2,8 @@ import pandas as pd
 import wandb
 import argparse
 
-from train import train_node_classifier
+from models.lightning_gnn_model import LightningGNNModel
+from train import test_node_classifier, train_node_classifier
 from hyperopt import optimalization
 from datasets.load_datasets import get_gtex_disgenet_dataset, get_gtex_disgenet_test_dataset
 from config import Config, ModelTypes
@@ -16,6 +17,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-model', type=str, choices=[ModelTypes.BASIC.value, ModelTypes.CLS_WEIGHT.value, ModelTypes.MULTITASK.value], default=ModelTypes.MULTITASK.value)
+    parser.add_argument('-model_ckpt_name', type=str)
     parser.add_argument('-disease', type=str)
     parser.add_argument('-pr_disease', type=str)
     parser.add_argument('-aux_diseases', nargs="+", type=str)
@@ -70,12 +72,15 @@ if __name__ == "__main__":
 
     # df = pd.DataFrame(dataset[0].y.numpy())
     # df.to_csv("results/y_matrix.csv", index=False)
-    
-    wandb.login(key=Config.wandb_api_key)
 
-    if args.opt:
-        optimalization(dataset=dataset)
+    if args.model_path:
+        test_node_classifier(dataset=dataset, model_ckpt_name=args.model_ckpt_name)
     else:
-        train_node_classifier(dataset=dataset)
+        wandb.login(key=Config.wandb_api_key)
 
-    wandb.finish()
+        if args.opt:
+            optimalization(dataset=dataset)
+        else:
+            train_node_classifier(dataset=dataset)
+
+        wandb.finish()

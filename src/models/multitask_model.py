@@ -20,12 +20,12 @@ class MultiTaskGNNModel(nn.Module):
             # nn.ReLU(inplace=True),
             # nn.Dropout(Config.dropout_rate),
             # nn.Linear(Config.mt_hidden_2, 1),
-            )
+            ) # shape: [gene number, 1]
 
         self.pr_layer = private_layer
         self.aux_layers = nn.ModuleList([copy.deepcopy(private_layer) for _ in range(aux_tasks_num)])
-        self.pr_classifier =  nn.BCEWithLogitsLoss(pos_weight=torch.tensor(Config.pr_pos_class_weight), reduction="none")
-        self.aux_classifiers =  [nn.BCEWithLogitsLoss(pos_weight=torch.tensor(w), reduction="none") for w in Config.aux_pos_class_weights]
+        self.pr_classifier = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(Config.pr_pos_class_weight), reduction="none") # shape: [gene number, 1]
+        self.aux_classifiers = [nn.BCEWithLogitsLoss(pos_weight=torch.tensor(w), reduction="none") for w in Config.aux_pos_class_weights]
         
     def forward(self, data, mode = "train", is_pretrain = False):
         x, edge_index, edge_weight = data.x, data.edge_index, data.edge_weight
@@ -57,4 +57,4 @@ class MultiTaskGNNModel(nn.Module):
                 x_pred_aux = classifier(aux_embeding, data.y[:, disease_idx].unsqueeze(1))
                 aux_losses.append(x_pred_aux)
            
-            return pr_loss, aux_losses
+            return pr_loss, aux_losses #shape [gene num, 1]

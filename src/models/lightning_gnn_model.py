@@ -32,7 +32,7 @@ class LightningGNNModel(pl.LightningModule):
             self.mt_gnn_meta = MultiTaskGNNModel(gnn=BasicGNNModel(), aux_tasks_num=Config.aux_task_num)
             self.cos_ = torch.nn.CosineSimilarity()
             
-            # weigth model, optimizer_v is not saved in the checkpoint !!!
+            # optimizer_v is not saved in the checkpoint !!!
             self.vnet = Weight(4, Config.v_emb_dim, 1, Config.v_act_type)
             self.optimizer_v = torch.optim.Adam(self.vnet.parameters(), lr=Config.v_lr, weight_decay=Config.v_wd)
 
@@ -48,7 +48,6 @@ class LightningGNNModel(pl.LightningModule):
             
             self.unused_params_cleared = False
             self.clear_unused_meta_params = False
-            self.train_step_meta = 0
             self.aux_cos_df = pd.DataFrame(columns=["epoch", "aux_idx", "cos", "weight"])
             self.get_model_params()
 
@@ -95,7 +94,6 @@ class LightningGNNModel(pl.LightningModule):
         # loss per example => reduce = false
         loss_pr, loss_aux_s = self.mt_gnn_meta.forward(data, mode)
 
-        #TODO: mean or sum?
         loss_pr_mean = loss_pr.mean()
         loss_aux_s_mean = [loss_aux.mean() for loss_aux in loss_aux_s]
 
@@ -112,7 +110,7 @@ class LightningGNNModel(pl.LightningModule):
 
         # embeddings for v-net
         loss_pr_emb = torch.stack((
-            loss_pr,
+            loss_pr.squeeze(1),
             torch.ones([len(loss_pr)], device=loss_pr.device),
             torch.zeros([len(loss_pr)], device=loss_pr.device),
             torch.full([len(loss_pr)], 1.0, device=loss_pr.device),
@@ -122,22 +120,23 @@ class LightningGNNModel(pl.LightningModule):
         loss_aux_s_emb = []
         for cos_aux, loss_aux in zip(pr_aux_s_cos, loss_aux_s):
             emb = torch.stack((
-                loss_aux,
+                loss_aux.squeeze(1), #shape: [gene num]
                 torch.zeros([len(loss_aux)], device=loss_pr.device), \
                 torch.ones([len(loss_aux)], device=loss_pr.device), \
                 torch.full([len(loss_aux)], cos_aux.item(), device=loss_pr.device)
-            ))  # shape: [5, N]
+            ))  # shape: [4, gene number]
 
-            # shape: [N, 5]
+            # shape: [N, 4]
             emb = emb.transpose(1, 0)
             loss_aux_s_emb.append(emb)
 
         # compute weight
-        v_pr = self.vnet(loss_pr_emb)
+        #TODO: normalize before MLP
+        v_pr = self.vnet(loss_pr_emb) #shape [gene num, 1]
         v_aux_s = [self.vnet(loss_aux_emb) for loss_aux_emb in loss_aux_s_emb]
 
         # compute loss
-        loss_pr_avg = (loss_pr * v_pr).mean()
+        loss_pr_avg = (loss_pr * v_pr).mean() # ([gene num, 1] * [gene num, 1]).mean
         loss_aux_avg_s = [(loss_aux * v_aux).mean() for loss_aux, v_aux in zip(loss_aux_s, v_aux_s)]
         loss_meta = loss_pr_avg  + sum(loss_aux_avg_s)
 
@@ -146,12 +145,11 @@ class LightningGNNModel(pl.LightningModule):
         loss_meta.backward()
         torch.nn.utils.clip_grad_norm_(self.params_meta, Config.clip)
         self.optimizer_meta.step()
-        self.train_step_meta += 1
-        self.scheduler_meta.step(self.train_step_meta)
+        self.scheduler_meta.step()
 
         # primary loss with updated parameter (Eq.7)
         _loss_pr_meta, _ = self.mt_gnn_meta.forward(data, mode)
-        loss_pr_meta += _loss_pr_meta
+        loss_pr_meta += _loss_pr_meta.mean()
 
         # backward and update v-net params (Eq.9)
         self.optimizer_v.zero_grad()
@@ -177,7 +175,7 @@ class LightningGNNModel(pl.LightningModule):
         # embeddings for v-net
         # shape = (5, batch size)   
         loss_pr_emb = torch.stack((
-            loss_pr,
+            loss_pr.squeeze(1),
             torch.ones([len(loss_pr)], device=loss_pr.device),
             torch.zeros([len(loss_pr)], device=loss_pr.device),
             torch.full([len(loss_pr)], 1.0, device=loss_pr.device),
@@ -187,7 +185,7 @@ class LightningGNNModel(pl.LightningModule):
         loss_aux_s_emb = []
         for cos_aux, loss_aux in zip(pr_aux_s_cos, loss_aux_s):
             emb = torch.stack((
-                loss_aux,
+                loss_aux.squeeze(1),
                 torch.zeros([len(loss_aux)], device=loss_pr.device), \
                 torch.ones([len(loss_aux)], device=loss_pr.device), \
                 torch.full([len(loss_aux)], cos_aux.item(), device=loss_pr.device)
@@ -209,7 +207,7 @@ class LightningGNNModel(pl.LightningModule):
                     "aux_idx": idx,
                     "vec": loss_a.detach().cpu(),
                     "cos": c.item(),
-                    "weight": w.item()
+                    "weight": w.mean()
                 }])],
                 ignore_index=True
             )
@@ -220,7 +218,7 @@ class LightningGNNModel(pl.LightningModule):
                     "aux_idx": Config.pr_disease_idx,
                     "vec": loss_pr.detach().cpu(),
                     "cos": 1,
-                    "weight": v_pr.item()
+                    "weight": v_pr.mean()
                 }])],
                 ignore_index=True
             )
@@ -236,10 +234,10 @@ class LightningGNNModel(pl.LightningModule):
         else:
             loss_aux_avg_weighted = 0
     
+        v_aux_s = torch.stack(v_aux_s)
+        v_aux_s_mean = v_aux_s.mean().item()
+        v_aux_s_std = v_aux_s.std().item()
 
-        v_aux_s_tensor = torch.tensor(v_aux_s)
-        v_aux_s_mean = v_aux_s_tensor.mean().item()
-        v_aux_s_std = v_aux_s_tensor.std().item()
         print(("Train Loss Pr: %.2f  Train Loss Aux: %.2f  Pr_Weight_Mean: %.4f Aux_Weight_Mean: %.4f Aux_Weight_Std: %.4f ") %
                 (loss_pr_avg_weighted, loss_aux_avg_weighted, v_pr.mean().item(), v_aux_s_mean, v_aux_s_std))
 
@@ -287,6 +285,7 @@ class LightningGNNModel(pl.LightningModule):
         elif self.model_name == ModelTypes.CLS_WEIGHT:
             return self.cls_test_step(data)
         elif self.model_name == ModelTypes.MULTITASK:
+            torch.save(self.vnet.state_dict(), f"{Config.pr_disease_idx}_vnet_weights.pth")
             return self.multitask_test_step(data)
         
     def multitask_test_step(self, data):
