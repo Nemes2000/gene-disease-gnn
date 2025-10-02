@@ -338,6 +338,7 @@ class LightningGNNModel(pl.LightningModule):
         self.log("Recall", recall_score(y_true, y_pred))
         self.log("Precision", precision_score(y_true, y_pred))
         self.log("AUPRC", average_precision_score(y_true, y_pred))
+        self.log("ROC-AUC", roc_auc)
         
         df = pd.DataFrame({"disease_idx": [Config.pr_disease_idx], 
                            "acc": [accuracy_score(y_masked, y_pred)], 
