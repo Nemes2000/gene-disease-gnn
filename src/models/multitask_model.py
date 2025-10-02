@@ -9,8 +9,6 @@ class MultiTaskGNNModel(nn.Module):
     def __init__(self, gnn: nn.Module, aux_tasks_num: int):
         super().__init__()
         self.gnn = gnn  # shared encoders
-
-        #TODO: feature importance score a sulyozó modellre
         
         private_layer = nn.Sequential(
             nn.Linear(Config.out_channels, 1),

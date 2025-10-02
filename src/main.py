@@ -73,7 +73,7 @@ if __name__ == "__main__":
     # df = pd.DataFrame(dataset[0].y.numpy())
     # df.to_csv("results/y_matrix.csv", index=False)
 
-    if args.model_path:
+    if args.model_ckpt_name:
         test_node_classifier(dataset=dataset, model_ckpt_name=args.model_ckpt_name)
     else:
         wandb.login(key=Config.wandb_api_key)

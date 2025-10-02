@@ -71,10 +71,6 @@ class LightningGNNModel(pl.LightningModule):
             mask_t[:, Config.disease_idx] = mask[:, Config.disease_idx]
             mask = mask_t
 
-        # After masking out the given percentage of the matrix i cant recreate the original one with same shape
-        # disease_num = data.y.shape[1]
-        # x_pred[mask].reshape(-1, disease_num)
-
         loss = self.loss_function(embeding[mask].unsqueeze(1), data.y[mask].unsqueeze(1))
 
         y_true = data.y[mask].detach().cpu().numpy()
@@ -88,10 +84,10 @@ class LightningGNNModel(pl.LightningModule):
     def multitask_forward(self, data, mode = "train"):
         loss_pr_meta = 0 
         pr_aux_s_cos = 0
+
         # meta models are the copy of original ones
         self.mt_gnn_meta.load_state_dict(self.mt_gnn.state_dict())
 
-        # loss per example => reduce = false
         loss_pr, loss_aux_s = self.mt_gnn_meta.forward(data, mode)
 
         loss_pr_mean = loss_pr.mean()
@@ -116,7 +112,10 @@ class LightningGNNModel(pl.LightningModule):
             torch.full([len(loss_pr)], 1.0, device=loss_pr.device),
         )).transpose(1,0)
 
-        
+        mean = loss_pr_emb.mean(dim=0, keepdim=True)
+        std = loss_pr_emb.std(dim=0, keepdim=True) + 1e-6  # avoid division by zero
+        loss_pr_emb = (loss_pr_emb - mean) / std
+
         loss_aux_s_emb = []
         for cos_aux, loss_aux in zip(pr_aux_s_cos, loss_aux_s):
             emb = torch.stack((
@@ -128,10 +127,14 @@ class LightningGNNModel(pl.LightningModule):
 
             # shape: [N, 4]
             emb = emb.transpose(1, 0)
+
+            mean = emb.mean(dim=0, keepdim=True)
+            std = emb.std(dim=0, keepdim=True) + 1e-6  # avoid division by zero
+            emb = (emb - mean) / std
+
             loss_aux_s_emb.append(emb)
 
         # compute weight
-        #TODO: normalize before MLP
         v_pr = self.vnet(loss_pr_emb) #shape [gene num, 1]
         v_aux_s = [self.vnet(loss_aux_emb) for loss_aux_emb in loss_aux_s_emb]
 
@@ -173,7 +176,7 @@ class LightningGNNModel(pl.LightningModule):
         pr_aux_s_cos = get_cos(self.params, self.mt_gnn, self.optimizer, self.share_param_name, self.cos_, loss_pr_mean, loss_aux_s_mean)
 
         # embeddings for v-net
-        # shape = (5, batch size)   
+        # shape = (gene num, 4)   
         loss_pr_emb = torch.stack((
             loss_pr.squeeze(1),
             torch.ones([len(loss_pr)], device=loss_pr.device),
@@ -181,6 +184,9 @@ class LightningGNNModel(pl.LightningModule):
             torch.full([len(loss_pr)], 1.0, device=loss_pr.device),
         )).transpose(1,0)
 
+        mean = loss_pr_emb.mean(dim=0, keepdim=True)
+        std = loss_pr_emb.std(dim=0, keepdim=True) + 1e-6  # avoid division by zero
+        loss_pr_emb = (loss_pr_emb - mean) / std
         
         loss_aux_s_emb = []
         for cos_aux, loss_aux in zip(pr_aux_s_cos, loss_aux_s):
@@ -191,8 +197,13 @@ class LightningGNNModel(pl.LightningModule):
                 torch.full([len(loss_aux)], cos_aux.item(), device=loss_pr.device)
             )) 
             
-            # shape: [N, 5]
+            # shape: [N, 4]
             emb = emb.transpose(1, 0)
+
+            mean = emb.mean(dim=0, keepdim=True)
+            std = emb.std(dim=0, keepdim=True) + 1e-6  # avoid division by zero
+            emb = (emb - mean) / std
+
             loss_aux_s_emb.append(emb)
 
         # compute weight
@@ -321,6 +332,12 @@ class LightningGNNModel(pl.LightningModule):
             # Mentés képként
             plt.savefig(f"results/multitask/{Config.sweep_num}_{Config.pr_disease_idx}_roc_curve.png", dpi=300)
             plt.close()
+
+        self.log("F1 score", f1_score(y_true, y_pred))
+        self.log("Accuracy", accuracy_score(y_masked, y_pred))
+        self.log("Recall", recall_score(y_true, y_pred))
+        self.log("Precision", precision_score(y_true, y_pred))
+        self.log("AUPRC", average_precision_score(y_true, y_pred))
         
         df = pd.DataFrame({"disease_idx": [Config.pr_disease_idx], 
                            "acc": [accuracy_score(y_masked, y_pred)], 
@@ -342,40 +359,40 @@ class LightningGNNModel(pl.LightningModule):
         return pr_loss.mean()
 
     def cls_test_step(self, data):
-        loss, acc, x_pred = self.basic_forward(data, mode="test")
+        loss, acc, embeding = self.basic_forward(data, mode="test")
 
         if Config.disease_idx:
-            x_pred_masked = x_pred[:, Config.disease_idx]
+            embeding_masked = embeding[:, Config.disease_idx]
             y_masked = data.y[:, Config.disease_idx]
         else:
-            x_pred_masked = x_pred[data.test_mask]
+            embeding_masked = embeding[data.test_mask]
             y_masked = data.y[data.test_mask]
 
-        x_pred_binary = torch.where(x_pred_masked > 0.5, torch.tensor(1, dtype=torch.int32), torch.tensor(0, dtype=torch.int32))
+        y_true = y_masked.detach().cpu().numpy()
+        y_pred = (embeding_masked > 0.5).int().detach().cpu().numpy()
 
-        self.log('test_loss', loss)
-        if len(np.unique(y_masked)) > 1:
-            self.log("ROC-AUC", roc_auc_score(y_masked, x_pred_binary))
+        if len(np.unique(y_true)) > 1:
+            self.log("ROC-AUC", roc_auc_score(y_true, y_pred))
 
-        self.log("F1 score", f1_score(y_masked, x_pred_binary))
+        self.log("F1 score", f1_score(y_true, y_pred))
         self.log("Accuracy", acc)
-        self.log("Recall", recall_score(y_masked, x_pred_binary))
-        self.log("Precision", precision_score(y_masked, x_pred_binary))
-        self.log("AUPRC", average_precision_score(y_masked, x_pred_binary))
+        self.log("Recall", recall_score(y_true, y_pred))
+        self.log("Precision", precision_score(y_true, y_pred))
+        self.log("AUPRC", average_precision_score(y_true, y_pred))
 
-        cm = confusion_matrix(y_masked, x_pred_binary)
+        cm = confusion_matrix(y_true, y_pred)
         disp = ConfusionMatrixDisplay(confusion_matrix=cm)
         disp.plot().figure_.savefig(f'results/matrices/confusion_matrix_{Config.disease_idx}.png')
         with open(f'results/matrices/confusion_matrix_{Config.disease_idx}.txt', "w") as file:
-            file.write(f"""acc: {accuracy_score(y_masked, x_pred_binary)}, 
-f1: {f1_score(y_masked, x_pred_binary)}, 
-recal: {recall_score(y_masked, x_pred_binary)}, 
-precision: {precision_score(y_masked, x_pred_binary)},
-auc: {roc_auc_score(y_masked, x_pred_binary)},
-auprc: {average_precision_score(y_masked, x_pred_binary)},
+            file.write(f"""acc: {accuracy_score(y_true, y_pred)}, 
+f1: {f1_score(y_true, y_pred)}, 
+recal: {recall_score(y_true, y_pred)}, 
+precision: {precision_score(y_true, y_pred)},
+auc: {roc_auc_score(y_true, y_pred)},
+auprc: {average_precision_score(y_true, y_pred)},
 cm: {" ".join(map(str, cm.flatten()))},
-x_sum: {x_pred_binary.sum().item()},
-y_sum: {y_masked.sum().item()}""")
+x_sum: {y_pred.sum().item()},
+y_sum: {y_true.sum().item()}""")
 
         return loss
 
@@ -406,8 +423,12 @@ y_sum: {y_masked.sum().item()}""")
                                "x_sum": y_pred.sum().item(),
                                "y_sum": y_true.sum().item()}
             
-        df.to_csv("results/new_disease_classifications.csv", index=False, sep=",")
+        df.to_csv(f"results/{Config.sweep_num}_disease_classifications.csv", index=False, sep=",")
         print("Creating pred disease statisctic. DONE")
+
+        if wandb.run is not None:
+            Config.sweep_num = Config.sweep_num + 1
+
         return loss
 
     def configure_optimizers(self):
