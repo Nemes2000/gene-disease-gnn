@@ -11,3 +11,4 @@ wandb==0.18.7
 scikit-learn==1.5.2
 seaborn==0.13.2
 tensorflow==2.18.0
+captum==0.8.0
