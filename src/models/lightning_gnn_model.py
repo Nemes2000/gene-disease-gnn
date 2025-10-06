@@ -242,12 +242,14 @@ class LightningGNNModel(pl.LightningModule):
         loss_pr_avg_weighted = loss_pr.mean()
         if len(loss_aux_s) >0:
             loss_aux_avg_weighted = torch.stack([l.mean() for l in loss_aux_s]).mean()
+            v_aux_s = torch.stack(v_aux_s)
+            v_aux_s_mean = v_aux_s.mean().item()
+            v_aux_s_std = v_aux_s.std().item()
         else:
             loss_aux_avg_weighted = 0
+            v_aux_s_mean = 0
+            v_aux_s_std = 0
     
-        v_aux_s = torch.stack(v_aux_s)
-        v_aux_s_mean = v_aux_s.mean().item()
-        v_aux_s_std = v_aux_s.std().item()
 
         print(("Train Loss Pr: %.2f  Train Loss Aux: %.2f  Pr_Weight_Mean: %.4f Aux_Weight_Mean: %.4f Aux_Weight_Std: %.4f ") %
                 (loss_pr_avg_weighted, loss_aux_avg_weighted, v_pr.mean().item(), v_aux_s_mean, v_aux_s_std))
