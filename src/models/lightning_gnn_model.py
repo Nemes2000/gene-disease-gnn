@@ -106,11 +106,11 @@ class LightningGNNModel(pl.LightningModule):
 
         # embeddings for v-net
         loss_pr_emb = torch.stack((
-            loss_pr.squeeze(1),
+            loss_pr.squeeze(1), # (gene num)
             torch.ones([len(loss_pr)], device=loss_pr.device),
             torch.zeros([len(loss_pr)], device=loss_pr.device),
             torch.full([len(loss_pr)], 1.0, device=loss_pr.device),
-        )).transpose(1,0)
+        )).transpose(1,0) # shape [gene num, 4]
 
         mean = loss_pr_emb.mean(dim=0, keepdim=True)
         std = loss_pr_emb.std(dim=0, keepdim=True) + 1e-6  # avoid division by zero
@@ -216,20 +216,9 @@ class LightningGNNModel(pl.LightningModule):
                 [self.aux_cos_df, pd.DataFrame([{
                     "epoch": self.current_epoch,
                     "aux_idx": idx,
-                    "vec": loss_a.detach().cpu(),
+                    "vec": loss_a.detach().cpu().squeeze(1).numpy().tolist(),
                     "cos": c.item(),
-                    "weight": w.mean()
-                }])],
-                ignore_index=True
-            )
-
-        self.aux_cos_df = pd.concat(
-                [self.aux_cos_df, pd.DataFrame([{
-                    "epoch": self.current_epoch,
-                    "aux_idx": Config.pr_disease_idx,
-                    "vec": loss_pr.detach().cpu(),
-                    "cos": 1,
-                    "weight": v_pr.mean()
+                    "weight": w.detach().cpu().squeeze(1).numpy().tolist()
                 }])],
                 ignore_index=True
             )

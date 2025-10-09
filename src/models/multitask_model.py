@@ -47,7 +47,7 @@ class MultiTaskGNNModel(nn.Module):
             pr_loss = self.pr_classifier(pr_embeding, data.y[:, Config.pr_disease_idx].unsqueeze(1))
             
             if mode == "test":
-                return pr_loss, pr_embeding
+                return pr_loss, pr_embeding #(gene num, 1), (gene num, 1)
 
             aux_losses = []
             for disease_idx, classifier, pr_layer in zip(Config.aux_disease_idxs, self.aux_classifiers, self.aux_layers):
@@ -55,4 +55,4 @@ class MultiTaskGNNModel(nn.Module):
                 x_pred_aux = classifier(aux_embeding, data.y[:, disease_idx].unsqueeze(1))
                 aux_losses.append(x_pred_aux)
            
-            return pr_loss, aux_losses #shape [gene num, 1]
+            return pr_loss, aux_losses #gene num, 1), [(gene num, 1), ...]
