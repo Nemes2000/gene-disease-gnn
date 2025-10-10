@@ -10,7 +10,12 @@ class BasicGNNModel(nn.Module):
         """
         super().__init__()
         
-        gnn_layer = geom_nn.GCNConv
+        if Config.gnn_layer_type == "GCN":
+            gnn_layer = geom_nn.GCNConv
+        elif Config.gnn_layer_type == "GraphSAGE":
+            gnn_layer = geom_nn.SAGEConv
+        elif Config.gnn_layer_type == "GAT":
+            gnn_layer = lambda in_channels, out_channels: geom_nn.GATConv(in_channels, out_channels, heads=Config.gat_heads, dropout=Config.dropout_rate, concat=False)
 
         layers = []
         in_channels, hidden_out_channels = Config.in_channels, Config.hidden_channels

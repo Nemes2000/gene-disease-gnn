@@ -28,9 +28,11 @@ class Config():
     epochs = 1
 
     #layer params
+    gnn_layer_type = "GCN" # GCN, GraphSAGE, GAT
+    gat_heads = 2
     dropout_rate = 0.041454
     num_classes = 2
-    hidden_channels = 39
+    hidden_channels = 40
     num_layers = 1
     in_channels = 0 # will receave from dataset
     out_channels = 0 # will receave from dataset

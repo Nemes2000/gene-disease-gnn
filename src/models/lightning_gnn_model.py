@@ -216,7 +216,7 @@ class LightningGNNModel(pl.LightningModule):
                 [self.aux_cos_df, pd.DataFrame([{
                     "epoch": self.current_epoch,
                     "aux_idx": idx,
-                    "vec": loss_a.detach().cpu().squeeze(1).numpy().tolist(),
+                    #"vec": loss_a.detach().cpu().squeeze(1).numpy().tolist(),
                     "cos": c.item(),
                     "weight": w.detach().cpu().squeeze(1).numpy().tolist()
                 }])],

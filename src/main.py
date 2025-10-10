@@ -17,6 +17,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-model', type=str, choices=[ModelTypes.BASIC.value, ModelTypes.CLS_WEIGHT.value, ModelTypes.MULTITASK.value], default=ModelTypes.MULTITASK.value)
+    parser.add_argument('-gnn_layer', type=str, choices=["GCN", "GraphSAGE", "GAT"], default="GAT")
     parser.add_argument('-model_ckpt_name', type=str)
     parser.add_argument('-disease', type=str)
     parser.add_argument('-pr_disease', type=str)
@@ -48,6 +49,9 @@ if __name__ == "__main__":
     else:
         dataset = get_gtex_disgenet_dataset()
 
+    if args.gnn_layer:
+        Config.gnn_layer_type = args.gnn_layer
+
     if args.model == ModelTypes.MULTITASK and args.pr_disease:
         Config.pr_disease_idx = dataset.mapper.diseases_id_to_idx_map()[args.pr_disease]
         Config.wandb_project_name += "_" + str(Config.pr_disease_idx)
@@ -60,10 +64,9 @@ if __name__ == "__main__":
             Config.aux_task_num = len(args.aux_diseases)
             Config.aux_pos_class_weights = [(all_g - dataset[0].y[:,idx].sum())/dataset[0].y[:, idx].sum() for idx in Config.aux_disease_idxs]
         if args.all_diseases:
-            Config.aux_disease_idxs = [i for i in range(dataset[0].y.shape[0]) if i != Config.pr_disease_idx]
+            Config.aux_disease_idxs = [i for i in range(dataset[0].y.shape[1]) if i != Config.pr_disease_idx]
             Config.aux_task_num = all_g - 1
             Config.aux_pos_class_weights = [(all_g - dataset[0].y[:,idx].sum())/dataset[0].y[:, idx].sum() for idx in Config.aux_disease_idxs]
-
 
     if args.disease:
         disease_idx = dataset.mapper.diseases_id_to_idx_map()[args.disease]
@@ -77,8 +80,8 @@ if __name__ == "__main__":
     Config.in_channels = dataset.num_node_features
     Config.out_channels = dataset[0].y.shape[1]
 
-    df = pd.DataFrame(dataset[0].y.numpy())
-    df.to_csv("results/y_matrix.csv", index=False)
+    # df = pd.DataFrame(dataset[0].y.numpy())
+    # df.to_csv("results/y_matrix.csv", index=False)
 
     if args.model_ckpt_name:
         test_node_classifier(dataset=dataset, model_ckpt_name=args.model_ckpt_name)

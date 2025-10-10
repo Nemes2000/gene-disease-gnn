@@ -31,7 +31,6 @@ def clean_param_name(model_list, name):
         for n, v in zip(model.state_dict(), model.parameters()):
             if v.grad is None and n in name:
                 name.remove(n)
-                print('remove', n)
 
 def record_grad(model_list, name):
     '''
