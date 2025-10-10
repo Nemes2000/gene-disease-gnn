@@ -21,6 +21,7 @@ if __name__ == "__main__":
     parser.add_argument('-disease', type=str)
     parser.add_argument('-pr_disease', type=str)
     parser.add_argument('-aux_diseases', nargs="+", type=str)
+    parser.add_argument('--all_diseases', action="store_true", help="If given, then all diseases will be used as auxiliary tasks except the primary disease.")
     parser.add_argument('-epoch', type=int)
     parser.add_argument('--opt', action='store_true', help="If given, then optimalization will run.")     
     parser.add_argument('-opt-step', type=int)
@@ -50,13 +51,19 @@ if __name__ == "__main__":
     if args.model == ModelTypes.MULTITASK and args.pr_disease:
         Config.pr_disease_idx = dataset.mapper.diseases_id_to_idx_map()[args.pr_disease]
         Config.wandb_project_name += "_" + str(Config.pr_disease_idx)
-        all_d = dataset[0].y.shape[1]
-        Config.pr_pos_class_weight =(all_d - dataset[0].y[:,Config.pr_disease_idx].sum())/dataset[0].y[:, Config.pr_disease_idx].sum()
+
+        all_g = dataset[0].y.shape[0]
+        Config.pr_pos_class_weight =(all_g - dataset[0].y[:,Config.pr_disease_idx].sum())/dataset[0].y[:, Config.pr_disease_idx].sum()
         
         if args.aux_diseases:
             Config.aux_disease_idxs =  [dataset.mapper.diseases_id_to_idx_map()[aux_disease] for aux_disease in args.aux_diseases]
             Config.aux_task_num = len(args.aux_diseases)
-            Config.aux_pos_class_weights = [(all_d - dataset[0].y[:,idx].sum())/dataset[0].y[:, idx].sum() for idx in Config.aux_disease_idxs]
+            Config.aux_pos_class_weights = [(all_g - dataset[0].y[:,idx].sum())/dataset[0].y[:, idx].sum() for idx in Config.aux_disease_idxs]
+        if args.all_diseases:
+            Config.aux_disease_idxs = [i for i in range(dataset[0].y.shape[0]) if i != Config.pr_disease_idx]
+            Config.aux_task_num = all_g - 1
+            Config.aux_pos_class_weights = [(all_g - dataset[0].y[:,idx].sum())/dataset[0].y[:, idx].sum() for idx in Config.aux_disease_idxs]
+
 
     if args.disease:
         disease_idx = dataset.mapper.diseases_id_to_idx_map()[args.disease]
@@ -70,8 +77,8 @@ if __name__ == "__main__":
     Config.in_channels = dataset.num_node_features
     Config.out_channels = dataset[0].y.shape[1]
 
-    # df = pd.DataFrame(dataset[0].y.numpy())
-    # df.to_csv("results/y_matrix.csv", index=False)
+    df = pd.DataFrame(dataset[0].y.numpy())
+    df.to_csv("results/y_matrix.csv", index=False)
 
     if args.model_ckpt_name:
         test_node_classifier(dataset=dataset, model_ckpt_name=args.model_ckpt_name)
