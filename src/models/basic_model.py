@@ -5,7 +5,7 @@ from config import Config
 
 class BasicGNNModel(nn.Module):
     def __init__(self):
-        """A basic GNN Model. Layers are builded from GCN layer. 
+        """A basic GNN Model. Layers are builded from Config.gnn_layer_type. 
 
         """
         super().__init__()
@@ -40,11 +40,12 @@ class BasicGNNModel(nn.Module):
 
         """
         for layer in self.layers:
-            # For graph layers, we need to add the "edge_index" tensor as additional input
-            # All PyTorch Geometric graph layer inherit the class "MessagePassing", hence
-            # we can simply check the class type.
-            if isinstance(layer, geom_nn.MessagePassing):
-                x = layer(x, edge_index, edge_weight)
+            if isinstance(layer, (geom_nn.GCNConv, geom_nn.GATConv)):
+                x = layer(x, edge_index, edge_weight=edge_weight)
+            elif isinstance(layer, geom_nn.SAGEConv):
+                edge_index = edge_index.long()
+                x = layer(x, edge_index)
             else:
                 x = layer(x)
+            
         return x

@@ -17,7 +17,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-model', type=str, choices=[ModelTypes.BASIC.value, ModelTypes.CLS_WEIGHT.value, ModelTypes.MULTITASK.value], default=ModelTypes.MULTITASK.value)
-    parser.add_argument('-gnn_layer', type=str, choices=["GCN", "GraphSAGE", "GAT"], default="GAT")
+    parser.add_argument('-gnn_layer', type=str, choices=["GCN", "GraphSAGE"], default="GraphSAGE")
     parser.add_argument('-model_ckpt_name', type=str)
     parser.add_argument('-disease', type=str)
     parser.add_argument('-pr_disease', type=str)
@@ -53,6 +53,7 @@ if __name__ == "__main__":
         Config.gnn_layer_type = args.gnn_layer
 
     if args.model == ModelTypes.MULTITASK and args.pr_disease:
+        Config.out_channels = 43
         Config.pr_disease_idx = dataset.mapper.diseases_id_to_idx_map()[args.pr_disease]
         Config.wandb_project_name += "_" + str(Config.pr_disease_idx)
 
@@ -76,9 +77,13 @@ if __name__ == "__main__":
         print("sum pos: ",dataset[0].train_mask[:,disease_idx].sum())
         print("y shape: ",dataset[0].y.shape)
 
+    
+    if args.model == ModelTypes.BASIC or args.model == ModelTypes.CLS_WEIGHT:
+        Config.wandb_project_name = "basic_gnn"
+        Config.out_channels = dataset[0].y.shape[1]
+
     Config.test_dataset = False
     Config.in_channels = dataset.num_node_features
-    Config.out_channels = dataset[0].y.shape[1]
 
     # df = pd.DataFrame(dataset[0].y.numpy())
     # df.to_csv("results/y_matrix.csv", index=False)

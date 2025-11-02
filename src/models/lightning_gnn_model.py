@@ -218,7 +218,7 @@ class LightningGNNModel(pl.LightningModule):
                     "aux_idx": idx,
                     #"vec": loss_a.detach().cpu().squeeze(1).numpy().tolist(),
                     "cos": c.item(),
-                    "weight": w.detach().cpu().squeeze(1).numpy().tolist()
+                    #"weight": w.detach().cpu().squeeze(1).numpy().tolist()
                 }])],
                 ignore_index=True
             )
@@ -374,8 +374,8 @@ class LightningGNNModel(pl.LightningModule):
 
         cm = confusion_matrix(y_true, y_pred)
         disp = ConfusionMatrixDisplay(confusion_matrix=cm)
-        disp.plot().figure_.savefig(f'results/matrices/confusion_matrix_{Config.disease_idx}.png')
-        with open(f'results/matrices/confusion_matrix_{Config.disease_idx}.txt', "w") as file:
+        disp.plot().figure_.savefig(f'results/matrices/{Config.gnn_layer_type}_confusion_matrix_{Config.disease_idx}.png')
+        with open(f'results/matrices/{Config.gnn_layer_type}_confusion_matrix_{Config.disease_idx}.txt', "w") as file:
             file.write(f"""acc: {accuracy_score(y_true, y_pred)}, 
 f1: {f1_score(y_true, y_pred)}, 
 recal: {recall_score(y_true, y_pred)}, 
